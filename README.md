@@ -19,11 +19,11 @@ To warm up C programming, implement the stack with list head. In addition, get f
 - The list head is one of the most handy, powerful data structures widely used in the Linux kernel. At first, it looks very weird, and its implementation (in `list_head.h`) is hard to understand even if you may master the pointer of C. Once you get used to it, however, it will be your best friend for building systems in C.
 - In fact, you don't have to understand how it works, but just try to get used to using it. It sounds crazy, but become Neo (believe me).
 - Here are some sites that may help you. You may find more (and better) examples in the Internet.
-  - Introduction: [https://kernelnewbies.org/FAQ/LinkedLists]([https://kernelnewbies.org/FAQ/LinkedLists)
+  - Introduction: [https://kernelnewbies.org/FAQ/LinkedLists](https://kernelnewbies.org/FAQ/LinkedLists)
   - Kernel API manual: [https://www.kernel.org/doc/html/v4.15/core-api/kernel-api.html](https://www.kernel.org/doc/html/v4.15/core-api/kernel-api.html)
   - Advanced explanation: [https://medium.com/@414apache/kernel-data-structures-linkedlist-b13e4f8de4bf](https://medium.com/@414apache/kernel-data-structures-linkedlist-b13e4f8de4bf)
 
-- There are three functions in `stack.c` waiting for your work. Complete `push_stack()`, `pop_stack()`, and `dump_stack()`.
+- There are three functions in `pa0.c` waiting for your work. Complete `push_stack()`, `pop_stack()`, and `dump_stack()`.
 
 - `push_stack()` and `pop_stack()` are straightforward. Add the given string value into the top of the stack, or remove the top of the stack. You may use the head of the list head as the top or the bottom of the stack at your own discretion.
 
@@ -60,4 +60,4 @@ To warm up C programming, implement the stack with list head. In addition, get f
   - Send an email to instructor([sanghoonkim@ajou.ac.kr](mailto:sanghoonkim@ajou.ac.kr)) if you forgot your ID and/or password.
   - New registration will be automatically processed in 10 seconds. Also send an email to instructor if you cannot see this class from your class list.
   - You can find the template code and this handout through the "Handout" button in the PA description. Start this programming assignment by cloning this repository from [https://git.ajou.ac.kr/sslab/os-pa0](https://git.ajou.ac.kr/sslab/os-pa0).
-- Submit only `stack.c` for the code. PASubmit will not evaluate your submission if you submit files with different names. You don't need to submit the report nor git repository for this PA.
+- Submit only `pa0.c` for the code. PASubmit will not evaluate your submission if you submit files with different names. You don't need to submit the report nor git repository for this PA.
