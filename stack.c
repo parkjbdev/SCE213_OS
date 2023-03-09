@@ -64,7 +64,7 @@ int main(int argc, char * const argv[])
 	}
 	fprintf(stderr, "\n");
 
-	/* Dump the current stac */
+	/* Dump the current stack */
 	dump_stack();
 	fprintf(stderr, "\n");
 

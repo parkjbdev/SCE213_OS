@@ -2,6 +2,8 @@
 #ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
 
+#define offsetof(TYPE, MEMBER)  ((size_t)&((TYPE *)0)->MEMBER)
+
 /**
  * container_of - cast a member of a structure out to the containing structure
  * @ptr:    the pointer to the member.
@@ -9,15 +11,12 @@
  * @member: the name of the member within the struct.
  *
  */
-#define offsetof(TYPE, MEMBER)  ((size_t)&((TYPE *)0)->MEMBER)
-
 #define container_of(ptr, type, member) ({              \
     void *__mptr = (void *)(ptr);                   \
     ((type *)(__mptr - offsetof(type, member))); })
 
 #define LIST_POISON1	((void *)0xdeadbeef)
 #define LIST_POISON2	((void *)0xbadacafe)
-
 
 /*
  * Simple doubly linked list implementation.
