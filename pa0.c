@@ -41,11 +41,9 @@ typedef struct entry Entry;
  *   Push @string into the @stack. The @string should be inserted into the top
  *   of the stack. You may use either the head or tail of the list for the top.
  */
-void push_stack(char * const string)
-{
-	/* TODO: Implement this function */
-    Entry * node = (Entry* )malloc(sizeof(Entry));
-    node->string =  (char*)malloc(strlen(string));
+void push_stack(char *const string) {
+    Entry *node = (Entry *) malloc(sizeof(Entry));
+    node->string = (char *) malloc(strlen(string));
     strcpy(node->string, string);
 
     list_add_tail(&node->list, &stack);
@@ -65,10 +63,9 @@ void push_stack(char * const string)
  *   If the stack is not empty, pop the top of @stack, and return 0
  *   If the stack is empty, return -1
  */
-int pop_stack(char * const buffer)
-{
-	/* TODO: Implement this function */
-	return -1;
+int pop_stack(char *const buffer) {
+    /* TODO: Implement this function */
+    return -1;
 }
 
 
@@ -80,10 +77,10 @@ int pop_stack(char * const buffer)
  *   traversing the stack from the bottom to the top. Note that the value
  *   should be printed out to @stderr to get properly graded in pasubmit.
  */
-void dump_stack(void)
-{
+void dump_stack(void) {
     Entry *ptr;
     list_for_each_entry(ptr, &stack, list) {
+        fprintf(stderr, "%s", ptr->string);
         printf("DUMP: %s\n", ptr->string);
     }
 }
