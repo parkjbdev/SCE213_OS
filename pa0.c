@@ -30,6 +30,9 @@ extern struct list_head stack;
  * include any header files if you want to ...                        */
 
 #include <stdlib.h>                    /* like this */
+#include <string.h>
+
+typedef struct entry Entry;
 
 /**
  * push_stack()
@@ -41,12 +44,12 @@ extern struct list_head stack;
 void push_stack(char * const string)
 {
 	/* TODO: Implement this function */
-    typedef struct entry Entry;
     Entry * node = (Entry* )malloc(sizeof(Entry));
-    INIT_LIST_HEAD(&node->list);
+    node->string =  (char*)malloc(strlen(string));
+    strcpy(node->string, string);
 
-    node->string = string;
     list_add_tail(&node->list, &stack);
+    printf("PUSH: %p    %s\n", string, node->string);
 }
 
 
@@ -79,5 +82,8 @@ int pop_stack(char * const buffer)
  */
 void dump_stack(void)
 {
-	/* TODO: Implement this function */
+    Entry *ptr;
+    list_for_each_entry(ptr, &stack, list) {
+        printf("DUMP: %s\n", ptr->string);
+    }
 }
