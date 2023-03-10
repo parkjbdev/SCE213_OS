@@ -41,6 +41,12 @@ extern struct list_head stack;
 void push_stack(char * const string)
 {
 	/* TODO: Implement this function */
+    typedef struct entry Entry;
+    Entry * node = (Entry* )malloc(sizeof(Entry));
+    INIT_LIST_HEAD(&node->list);
+
+    node->string = string;
+    list_add_tail(&node->list, &stack);
 }
 
 
