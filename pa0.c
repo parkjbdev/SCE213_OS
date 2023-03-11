@@ -47,7 +47,6 @@ void push_stack(char *const string) {
     strcpy(node->string, string);
 
     list_add_tail(&node->list, &stack);
-    printf("PUSH: %p    %s\n", string, node->string);
 }
 
 
@@ -64,8 +63,17 @@ void push_stack(char *const string) {
  *   If the stack is empty, return -1
  */
 int pop_stack(char *const buffer) {
-    /* TODO: Implement this function */
-    return -1;
+    if (list_empty(&stack)) return -1;
+
+    Entry *last_entry = list_last_entry(&stack, Entry, list);
+    strcpy(buffer, last_entry->string);
+    list_del(&last_entry->list);
+
+    // TODO: Free memory
+//    free(last_entry->string);
+//    free(last_entry);
+
+    return 0;
 }
 
 
@@ -81,6 +89,5 @@ void dump_stack(void) {
     Entry *ptr;
     list_for_each_entry(ptr, &stack, list) {
         fprintf(stderr, "%s", ptr->string);
-        printf("DUMP: %s\n", ptr->string);
     }
 }
