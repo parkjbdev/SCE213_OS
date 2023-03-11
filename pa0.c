@@ -43,7 +43,7 @@ typedef struct entry Entry;
  */
 void push_stack(char *const string) {
     Entry *node = (Entry *) malloc(sizeof(Entry));
-    node->string = (char *) malloc(strlen(string));
+    node->string = (char *) malloc(strlen(string) + 1);
     strcpy(node->string, string);
 
     INIT_LIST_HEAD(&node->list);
@@ -70,9 +70,8 @@ int pop_stack(char *const buffer) {
     strcpy(buffer, last_entry->string);
     list_del(&last_entry->list);
 
-    // TODO: Free memory
-//    free(last_entry->string);
-//    free(last_entry);
+    free(last_entry->string);
+    free(last_entry);
 
     return 0;
 }
