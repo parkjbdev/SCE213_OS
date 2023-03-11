@@ -46,6 +46,7 @@ void push_stack(char *const string) {
     node->string = (char *) malloc(strlen(string));
     strcpy(node->string, string);
 
+    INIT_LIST_HEAD(&node->list);
     list_add_tail(&node->list, &stack);
 }
 
