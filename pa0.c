@@ -89,6 +89,6 @@ int pop_stack(char *const buffer) {
 void dump_stack(void) {
     Entry *ptr;
     list_for_each_entry(ptr, &stack, list) {
-        fprintf(stderr, "%s", ptr->string);
+        fprintf(stderr, "%s\n", ptr->string);
     }
 }
