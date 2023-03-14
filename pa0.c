@@ -42,8 +42,14 @@ typedef struct entry Entry;
  *   of the stack. You may use either the head or tail of the list for the top.
  */
 void push_stack(char *const string) {
-    Entry *node = (Entry *) malloc(sizeof(Entry));
-    node->string = (char *) malloc(strlen(string) + 1);
+    Entry *node = NULL;
+    while (node == NULL)
+        node = (Entry *) malloc(sizeof(Entry));
+
+    node->string = NULL;
+    while (node->string == NULL)
+        node->string = (char *) malloc(strlen(string) + 1);
+
     strcpy(node->string, string);
 
     INIT_LIST_HEAD(&node->list);
