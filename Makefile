@@ -21,19 +21,23 @@ clean:
 
 .PHONY: test-run
 test-run: $(TARGET) toy testcases/test-run
-	./$< -q < testcases/test-run
+	./$< < testcases/test-run
 
 .PHONY: test-cd
 test-cd: $(TARGET) testcases/test-cd
 	./$< -q < testcases/test-cd
 
-.PHONY: test-history
-test-history: $(TARGET) testcases/test-history
-	./$< -q < testcases/test-history
+.PHONY: test-alias
+test-alias: $(TARGET) testcases/test-alias
+	./$< -q < testcases/test-alias
 
 .PHONY: test-pipe
 test-pipe: $(TARGET) testcases/test-pipe
 	./$< -q < testcases/test-pipe
 
-test-all: test-run test-cd test-history test-pipe
-	echo
+.PHONY: test-combined
+test-combined: $(TARGET) testcases/test-combined
+	./$< -q < testcases/test-combined
+
+.PHONY: test-all
+test-all: test-run test-cd test-alias test-pipe test-combined
