@@ -31,9 +31,27 @@
  *   Return 0 when user inputs "exit"
  *   Return <0 on error
  */
+int builtin_cd(char *dir) {
+    if (strcmp(dir, "~") == 0) {
+      dir = getenv("HOME");
+    } else if (strcmp(dir, "-") == 0) {
+      dir = getenv("OLDPWD");
+    }
+
+    int result = chdir(dir) == 0 ? 1 : -1;
+    if (result < 0) perror("cd");
+    else setenv("OLDPWD", getenv("PWD"), 0);
+
+    return result;
+}
 int run_command(int nr_tokens, char *tokens[])
 {
 	if (strcmp(tokens[0], "exit") == 0) return 0;
+  if (strcmp(tokens[0], "cd") == 0) {
+    if (nr_tokens == 1) return builtin_cd("~");
+    else if (nr_tokens == 2) return builtin_cd(tokens[1]);
+    else return -1;
+  }
 
     int pid = fork();
     if (pid < 0) return -1;
