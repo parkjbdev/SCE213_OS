@@ -32,25 +32,19 @@ typedef struct _alias {
 int alias_cnt = 0;
 Alias **aliases = NULL;
 
-Alias* new_alias(char *alias, int argc, char *argv[]) {
-    Alias *new = (Alias *)malloc(sizeof(Alias));
+Alias *new_alias(char *alias, int argc, char *argv[]) {
+    Alias *new = (Alias *) malloc(sizeof(Alias));
 
-    new->alias = (char *)malloc(sizeof(char) * (strlen(alias) + 1));
-    strcpy(new->alias, alias);
-
+    new->alias = strdup(alias);
     new->nr_tokens = argc;
-
-    new->tokens = (char **)malloc(sizeof(char *) * argc);
-    for (int i = 0; i < argc;i++) {
-        new->tokens[i] = (char *)malloc(sizeof(char) * (strlen(argv[i]) + 1));
-        strcpy(new->tokens[i], argv[i]);
-    }
+    new->tokens = (char **) malloc(sizeof(char *) * argc);
+    for (int i = 0; i < argc; i++) new->tokens[i] = strdup(argv[i]);
 
     return new;
 }
 
-void delete_alias(Alias * target) {
-    for (int i = 0; i < target->nr_tokens;i++) {
+void delete_alias(Alias *target) {
+    for (int i = 0; i < target->nr_tokens; i++) {
         free(target->tokens[i]);
     }
     free(target->tokens);
@@ -59,10 +53,8 @@ void delete_alias(Alias * target) {
 }
 
 Alias *find_alias(char *alias) {
-    for (int i = 0; i < alias_cnt; i++)
-    {
-        if (strcmp(aliases[i]->alias, alias) == 0)
-        {
+    for (int i = 0; i < alias_cnt; i++) {
+        if (strcmp(aliases[i]->alias, alias) == 0) {
             return aliases[i];
         }
     }
@@ -73,18 +65,18 @@ int builtin_alias_add(char *alias, int argc, char *argv[]) {
     Alias *found = find_alias(alias);
 
     if (found == NULL) {
-        aliases = (Alias **)realloc(aliases, sizeof(Alias *) * (alias_cnt + 1));
+        aliases = (Alias **) realloc(aliases, sizeof(Alias *) * (alias_cnt + 1));
         aliases[alias_cnt++] = new_alias(alias, argc, argv);
         return 1;
     }
 
-    for (int i = 0; i < found->nr_tokens;i++) {
+    for (int i = 0; i < found->nr_tokens; i++) {
         free(found->tokens[i]);
     }
     found->nr_tokens = argc;
-    found->tokens = (char **)realloc(found->tokens, sizeof(char *) * argc);
-    for (int i = 0; i < argc;i++) {
-        found->tokens[i] = (char *)malloc(sizeof(char) * (strlen(argv[i]) + 1));
+    found->tokens = (char **) realloc(found->tokens, sizeof(char *) * argc);
+    for (int i = 0; i < argc; i++) {
+        found->tokens[i] = (char *) malloc(sizeof(char) * (strlen(argv[i]) + 1));
         strcpy(found->tokens[i], argv[i]);
     }
 
@@ -154,14 +146,14 @@ int run_command(int nr_tokens, char *tokens[]) {
     }
 
     // Replace Alias
-    for (int i = 0; i < nr_tokens;i++) {
+    for (int i = 0; i < nr_tokens; i++) {
         Alias *alias = find_alias(tokens[i]);
         if (alias == NULL) continue;
         nr_tokens += alias->nr_tokens - 1;
-        for (int j = nr_tokens; j > i + alias->nr_tokens - 1;j--) {
+        for (int j = nr_tokens; j > i + alias->nr_tokens - 1; j--) {
             tokens[j] = tokens[j - alias->nr_tokens + 1];
         }
-        for (int j = i; j < i + alias->nr_tokens;j++) {
+        for (int j = i; j < i + alias->nr_tokens; j++) {
             tokens[j] = strdup(alias->tokens[j - i]);
         }
         i += alias->nr_tokens - 1;
