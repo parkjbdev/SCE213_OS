@@ -137,34 +137,28 @@ int run_command(int nr_tokens, char *tokens[])
   // replace alias
   int new_nr_tokens = nr_tokens;
   char **new_tokens = (char **)malloc(sizeof(char *) * new_nr_tokens);
-  for (int i = 0;i < nr_tokens;i++) {
-    new_tokens[i] = (char *)malloc(sizeof(char) * (strlen(tokens[i]) + 1));
-    strcpy(new_tokens[i], tokens[i]);
-  }
 
-  for (int i = 0;i < new_nr_tokens;i++) {
+  int cnt = 0;
+
+  for (int i = 0;i < nr_tokens;i++) {
     Alias *alias = find_alias(tokens[i]);
 
-    if (alias == NULL) continue;
-
-    new_nr_tokens = new_nr_tokens - 1 + alias->nr_tokens;
-    new_tokens = (char **)realloc(new_tokens, sizeof(char *) * new_nr_tokens);
-
-    for (int j = i + alias->nr_tokens;j < new_nr_tokens;j++) {
-      new_tokens[j] = (char *)malloc(sizeof(char) * (strlen(tokens[j - alias->nr_tokens + 1]) + 1));
-      strcpy(new_tokens[j], tokens[j - alias->nr_tokens + 1]);
+    if (alias == NULL) {
+        new_tokens[i + cnt] = (char *) malloc(sizeof(char) * (strlen(tokens[i]) + 1));
+        strcpy(new_tokens[i + cnt], tokens[i]);
+        continue;
     }
 
-    for (int j = i;j < i + alias->nr_tokens;j++) {
-      new_tokens[j] = (char *)malloc(sizeof(char) * (strlen(alias->tokens[j - i]) + 1));
-      strcpy(new_tokens[j], alias->tokens[j - i]);
+    cnt += alias -> nr_tokens - 1;
+    new_nr_tokens = new_nr_tokens + cnt;
+    new_tokens = (char **)realloc(new_tokens, sizeof(char *) * (new_nr_tokens + 1));
+
+    for (int j = 0;j < alias -> nr_tokens;j++) {
+        new_tokens[i+j] = (char *)malloc(sizeof(char) * (strlen(alias->tokens[j]) + 1));
+        strcpy(new_tokens[i + j], alias -> tokens[j]);
     }
 
     i = i + alias->nr_tokens - 1;
-  }
-
-  for (int i = 0;i < new_nr_tokens;i++) {
-    fprintf(stderr, "%s \n", new_tokens[i]);
   }
 
     int pid = fork();
@@ -176,6 +170,8 @@ int run_command(int nr_tokens, char *tokens[])
         } else exit(0);
     } else {
         wait(0);
+        for (int i = 0;i < new_nr_tokens;i++) free(new_tokens[i]);
+        free(new_tokens);
         return 1;
     }
 }
