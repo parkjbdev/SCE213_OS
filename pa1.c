@@ -200,4 +200,13 @@ int initialize(int argc, char *const argv[]) {
  *   you may leave this function blank.
  */
 void finalize(int argc, char *const argv[]) {
+    // Free Aliases
+    for (int i = 0;i < alias_cnt;i++) {
+        free(aliases[i].alias);
+        for (int j = 0;j < aliases[i].nr_tokens;j++) {
+            free(aliases[i].tokens[j]);
+        }
+        free(aliases[i].tokens);
+    }
+    free(aliases);
 }
