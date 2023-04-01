@@ -162,7 +162,7 @@ int run_command(int nr_tokens, char *tokens[]) {
         Alias *alias = find_alias(tokens[i]);
 
         if (alias == NULL) {
-            new_tokens[new_tokens_idx++] = tokens[i];
+            new_tokens[new_tokens_idx++] = strdup(tokens[i]);
             continue;
         }
 
@@ -170,7 +170,7 @@ int run_command(int nr_tokens, char *tokens[]) {
         new_tokens = (char **) realloc(new_tokens, sizeof(char *) * (new_nr_tokens + 1));
 
         for (int j = 0; j < alias->nr_tokens; j++) {
-            new_tokens[new_tokens_idx++] = alias->tokens[j];
+            new_tokens[new_tokens_idx++] = strdup(alias->tokens[j]);
         }
     }
     new_tokens[new_nr_tokens] = NULL;
