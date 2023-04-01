@@ -30,35 +30,63 @@ typedef struct _alias {
 } Alias;
 
 int alias_cnt = 0;
-Alias *aliases = NULL;
+Alias **aliases = NULL;
 
-int builtin_alias_add(char *alias, int argc, char *argv[]) {
-    for (int i = 0; i < alias_cnt; i++) {
-        if (strcmp(aliases[i].alias, alias) == 0) {
-            for (int j = 0; j < aliases[i].nr_tokens; j++)
-                free(aliases[i].tokens[j]);
-            aliases[i].nr_tokens = argc;
-            aliases[i].tokens = (char **) realloc(aliases[i].tokens, sizeof(char *) * argc);
-            for (int j = 0; j < argc; j++) {
-                aliases[i].tokens[j] = (char *) malloc(sizeof(char) * (strlen(argv[j]) + 1));
-                strcpy(aliases[i].tokens[j], argv[j]);
-            }
+Alias* new_alias(char *alias, int argc, char *argv[]) {
+    Alias *new = (Alias *)malloc(sizeof(Alias));
 
-            return 1;
+    new->alias = (char *)malloc(sizeof(char) * (strlen(alias) + 1));
+    strcpy(new->alias, alias);
+
+    new->nr_tokens = argc;
+
+    new->tokens = (char **)malloc(sizeof(char *) * argc);
+    for (int i = 0; i < argc;i++) {
+        new->tokens[i] = (char *)malloc(sizeof(char) * (strlen(argv[i]) + 1));
+        strcpy(new->tokens[i], argv[i]);
+    }
+
+    return new;
+}
+
+void delete_alias(Alias * target) {
+    for (int i = 0; i < target->nr_tokens;i++) {
+        free(target->tokens[i]);
+    }
+    free(target->tokens);
+    free(target->alias);
+    free(target);
+}
+
+Alias *find_alias(char *alias) {
+    for (int i = 0; i < alias_cnt; i++)
+    {
+        if (strcmp(aliases[i]->alias, alias) == 0)
+        {
+            return aliases[i];
         }
     }
+    return NULL;
+}
 
-    aliases = (Alias *) realloc(aliases, sizeof(Alias) * (alias_cnt + 1));
-    aliases[alias_cnt].alias = (char *) malloc(sizeof(char) * (strlen(alias) + 1));
-    strcpy(aliases[alias_cnt].alias, alias);
-    aliases[alias_cnt].nr_tokens = argc;
-    aliases[alias_cnt].tokens = (char **) malloc(sizeof(char *) * argc);
-    for (int i = 0; i < argc; i++) {
-        aliases[alias_cnt].tokens[i] = (char *) malloc(sizeof(char) * (strlen(argv[i]) + 1));
-        strcpy(aliases[alias_cnt].tokens[i], argv[i]);
+int builtin_alias_add(char *alias, int argc, char *argv[]) {
+    Alias *found = find_alias(alias);
+
+    if (found == NULL) {
+        aliases = (Alias **)realloc(aliases, sizeof(Alias *) * (alias_cnt + 1));
+        aliases[alias_cnt++] = new_alias(alias, argc, argv);
+        return 1;
     }
 
-    alias_cnt++;
+    for (int i = 0; i < found->nr_tokens;i++) {
+        free(found->tokens[i]);
+    }
+    found->nr_tokens = argc;
+    found->tokens = (char **)realloc(found->tokens, sizeof(char *) * argc);
+    for (int i = 0; i < argc;i++) {
+        found->tokens[i] = (char *)malloc(sizeof(char) * (strlen(argv[i]) + 1));
+        strcpy(found->tokens[i], argv[i]);
+    }
 
     return 1;
 }
@@ -66,22 +94,13 @@ int builtin_alias_add(char *alias, int argc, char *argv[]) {
 int builtin_alias_print() {
     if (alias_cnt == 0) return 0;
     for (int i = 0; i < alias_cnt; i++) {
-        fprintf(stderr, "%s:", aliases[i].alias);
-        for (int j = 0; j < aliases[i].nr_tokens; j++) {
-            fprintf(stderr, " %s", aliases[i].tokens[j]);
+        fprintf(stderr, "%s:", aliases[i]->alias);
+        for (int j = 0; j < aliases[i]->nr_tokens; j++) {
+            fprintf(stderr, " %s", aliases[i]->tokens[j]);
         }
         fprintf(stderr, "\n");
     }
     return 1;
-}
-
-Alias *find_alias(char *alias) {
-    for (int i = 0; i < alias_cnt; i++) {
-        if (strcmp(aliases[i].alias, alias) == 0) {
-            return &aliases[i];
-        }
-    }
-    return NULL;
 }
 
 
@@ -197,11 +216,8 @@ int initialize(int argc, char *const argv[]) {
 void finalize(int argc, char *const argv[]) {
     // Free Aliases
     for (int i = 0; i < alias_cnt; i++) {
-        free(aliases[i].alias);
-        for (int j = 0; j < aliases[i].nr_tokens; j++) {
-            free(aliases[i].tokens[j]);
-        }
-        free(aliases[i].tokens);
+        delete_alias(aliases[i]);
     }
+    alias_cnt = 0;
     free(aliases);
 }
