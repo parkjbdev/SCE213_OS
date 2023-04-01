@@ -18,33 +18,10 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 /***********************************************************************
- * run_command()
- *
- * DESCRIPTION
- *   Implement the specified shell features here using the parsed
- *   command tokens.
- *
- * RETURN VALUE
- *   Return 1 on successful command execution
- *   Return 0 when user inputs "exit"
- *   Return <0 on error
+ * builtin_alias
  */
-int builtin_cd(char *dir) {
-    if (strcmp(dir, "~") == 0) {
-        dir = getenv("HOME");
-    } else if (strcmp(dir, "-") == 0) {
-        dir = getenv("OLDPWD");
-    }
-
-    int result = chdir(dir) == 0 ? 1 : -1;
-    if (result < 0) perror("cd");
-    else setenv("OLDPWD", getenv("PWD"), 0);
-
-    return result;
-}
 
 typedef struct _alias {
     char *alias;
@@ -87,6 +64,7 @@ int builtin_alias_add(char *alias, int argc, char *argv[]) {
 }
 
 int builtin_alias_print() {
+    if (alias_cnt == 0) return 0;
     for (int i = 0; i < alias_cnt; i++) {
         fprintf(stderr, "%s:", aliases[i].alias);
         for (int j = 0; j < aliases[i].nr_tokens; j++) {
@@ -105,6 +83,42 @@ Alias *find_alias(char *alias) {
     }
     return NULL;
 }
+
+
+/***********************************************************************
+ * builtin_cd()
+ * @details change directory, set OLDPWD
+ * @param dir ~ to home directory, - to OLDPWD
+ * @return 1 if succeed -1 if failed
+ */
+
+int builtin_cd(char *dir) {
+    if (strcmp(dir, "~") == 0) {
+        dir = getenv("HOME");
+    } else if (strcmp(dir, "-") == 0) {
+        dir = getenv("OLDPWD");
+    }
+
+    int result = chdir(dir) == 0 ? 1 : -1;
+    if (result < 0) perror("cd");
+    else setenv("OLDPWD", getenv("PWD"), 0);
+
+    return result;
+}
+
+
+/***********************************************************************
+ * run_command()
+ *
+ * DESCRIPTION
+ *   Implement the specified shell features here using the parsed
+ *   command tokens.
+ *
+ * RETURN VALUE
+ *   Return 1 on successful command execution
+ *   Return 0 when user inputs "exit"
+ *   Return <0 on error
+ */
 
 int run_command(int nr_tokens, char *tokens[]) {
     if (nr_tokens == 0) return 1;
@@ -130,21 +144,16 @@ int run_command(int nr_tokens, char *tokens[]) {
         Alias *alias = find_alias(tokens[i]);
 
         if (alias == NULL) {
-            new_tokens[i + cnt] = (char *) malloc(sizeof(char) * (strlen(tokens[i]) + 1));
-            strcpy(new_tokens[i + cnt], tokens[i]);
+            new_tokens[cnt++] = tokens[i];
             continue;
         }
 
-        cnt += alias->nr_tokens - 1;
-        new_nr_tokens = new_nr_tokens + cnt;
+        new_nr_tokens = new_nr_tokens + alias->nr_tokens - 1;
         new_tokens = (char **) realloc(new_tokens, sizeof(char *) * (new_nr_tokens + 1));
 
         for (int j = 0; j < alias->nr_tokens; j++) {
-            new_tokens[i + j] = (char *) malloc(sizeof(char) * (strlen(alias->tokens[j]) + 1));
-            strcpy(new_tokens[i + j], alias->tokens[j]);
+            new_tokens[cnt++] = alias->tokens[j];
         }
-
-        i = i + alias->nr_tokens - 1;
     }
 
     int pid = fork();
@@ -156,7 +165,6 @@ int run_command(int nr_tokens, char *tokens[]) {
         } else exit(0);
     } else {
         wait(0);
-        for (int i = 0; i < new_nr_tokens; i++) free(new_tokens[i]);
         free(new_tokens);
         return 1;
     }
