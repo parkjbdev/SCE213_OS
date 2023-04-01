@@ -154,37 +154,28 @@ int run_command(int nr_tokens, char *tokens[]) {
     }
 
     // Replace Alias
-    int new_nr_tokens = nr_tokens;
-    char **new_tokens = (char **) malloc(sizeof(char *) * new_nr_tokens);
-    int new_tokens_idx = 0;
-
-    for (int i = 0; i < nr_tokens; i++) {
+    for (int i = 0; i < nr_tokens;i++) {
         Alias *alias = find_alias(tokens[i]);
-
-        if (alias == NULL) {
-            new_tokens[new_tokens_idx++] = strdup(tokens[i]);
-            continue;
+        if (alias == NULL) continue;
+        nr_tokens += alias->nr_tokens - 1;
+        for (int j = nr_tokens; j > i + alias->nr_tokens - 1;j--) {
+            tokens[j] = tokens[j - alias->nr_tokens + 1];
         }
-
-        new_nr_tokens += alias->nr_tokens - 1;
-        new_tokens = (char **) realloc(new_tokens, sizeof(char *) * (new_nr_tokens + 1));
-
-        for (int j = 0; j < alias->nr_tokens; j++) {
-            new_tokens[new_tokens_idx++] = strdup(alias->tokens[j]);
+        for (int j = i; j < i + alias->nr_tokens;j++) {
+            tokens[j] = strdup(alias->tokens[j - i]);
         }
+        i += alias->nr_tokens - 1;
     }
-    new_tokens[new_nr_tokens] = NULL;
 
     int pid = fork();
     if (pid < 0) return -1;
     else if (pid == 0) {
-        if (execvp(new_tokens[0], new_tokens) < 0) {
-            fprintf(stderr, "Unable to execute %s\n", new_tokens[0]);
+        if (execvp(tokens[0], tokens) < 0) {
+            fprintf(stderr, "Unable to execute %s\n", tokens[0]);
             exit(EXIT_FAILURE);
         } else exit(EXIT_SUCCESS);
     } else {
         wait(NULL);
-        free(new_tokens);
         return 1;
     }
 }

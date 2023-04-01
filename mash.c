@@ -70,7 +70,7 @@ int main(int argc, char * const argv[])
 		int nr_tokens = 0;
 
 		__print_prompt();
-	
+
 		if (!fgets(command, sizeof(command), stdin)) break;
 
 		parse_command(command, &nr_tokens, tokens);
