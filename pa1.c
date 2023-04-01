@@ -154,6 +154,7 @@ int run_command(int nr_tokens, char *tokens[]) {
             new_tokens[new_tokens_idx++] = alias->tokens[j];
         }
     }
+    new_tokens[new_nr_tokens] = NULL;
 
     int pid = fork();
     if (pid < 0) return -1;
