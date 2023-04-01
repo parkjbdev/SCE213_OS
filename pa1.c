@@ -134,25 +134,24 @@ int run_command(int nr_tokens, char *tokens[]) {
         else return -1;
     }
 
-    // replace alias
+    // Replace Alias
     int new_nr_tokens = nr_tokens;
     char **new_tokens = (char **) malloc(sizeof(char *) * new_nr_tokens);
-
-    int cnt = 0;
+    int new_tokens_idx = 0;
 
     for (int i = 0; i < nr_tokens; i++) {
         Alias *alias = find_alias(tokens[i]);
 
         if (alias == NULL) {
-            new_tokens[cnt++] = tokens[i];
+            new_tokens[new_tokens_idx++] = tokens[i];
             continue;
         }
 
-        new_nr_tokens = new_nr_tokens + alias->nr_tokens - 1;
+        new_nr_tokens += alias->nr_tokens - 1;
         new_tokens = (char **) realloc(new_tokens, sizeof(char *) * (new_nr_tokens + 1));
 
         for (int j = 0; j < alias->nr_tokens; j++) {
-            new_tokens[cnt++] = alias->tokens[j];
+            new_tokens[new_tokens_idx++] = alias->tokens[j];
         }
     }
 
@@ -161,10 +160,10 @@ int run_command(int nr_tokens, char *tokens[]) {
     else if (pid == 0) {
         if (execvp(new_tokens[0], new_tokens) < 0) {
             fprintf(stderr, "Unable to execute %s\n", new_tokens[0]);
-            exit(1);
-        } else exit(0);
+            exit(EXIT_FAILURE);
+        } else exit(EXIT_SUCCESS);
     } else {
-        wait(0);
+        wait(NULL);
         free(new_tokens);
         return 1;
     }
