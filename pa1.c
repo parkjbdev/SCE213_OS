@@ -55,19 +55,6 @@ typedef struct _alias {
 int alias_cnt = 0;
 Alias *aliases = NULL;
 
-char *concat_strings(int argc, char *argv[]) {
-    int len = 0;
-    for (int i = 0; i < argc; i++)
-        len += strlen(argv[i]) + 1;
-    char *result = (char *) malloc(sizeof(char) * len);
-    strcpy(result, argv[0]);
-    for (int i = 1; i < argc; i++) {
-        strcat(result, " ");
-        strcat(result, argv[i]);
-    }
-    return result;
-}
-
 int builtin_alias_add(char *alias, int argc, char *argv[]) {
     for (int i = 0; i < alias_cnt; i++) {
         if (strcmp(aliases[i].alias, alias) == 0) {
@@ -201,9 +188,9 @@ int initialize(int argc, char *const argv[]) {
  */
 void finalize(int argc, char *const argv[]) {
     // Free Aliases
-    for (int i = 0;i < alias_cnt;i++) {
+    for (int i = 0; i < alias_cnt; i++) {
         free(aliases[i].alias);
-        for (int j = 0;j < aliases[i].nr_tokens;j++) {
+        for (int j = 0; j < aliases[i].nr_tokens; j++) {
             free(aliases[i].tokens[j]);
         }
         free(aliases[i].tokens);
