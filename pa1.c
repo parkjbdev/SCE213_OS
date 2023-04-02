@@ -117,6 +117,89 @@ int builtin_cd(char *dir) {
     return result;
 }
 
+int idx_of_pipeline(int nr_tokens, char *tokens[]) {
+    for (int i = 0; i < nr_tokens; i++) {
+        if (strcmp(tokens[i], "|") == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/**
+ * split_array
+ *
+ * @param result left split subarray, length of idx
+ * @param idx index to split by
+ * @param array array to split
+ * @return right split subarray
+ */
+
+char **split_array(char ***result, int idx, char *array[]) {
+    *result = (char **) malloc(sizeof(char *) * idx);
+
+    for (int i = 0; i < idx; i++)
+        (*result)[i] = array[i];
+
+    return &array[idx + 1];
+}
+
+int execute(int nr_tokens, char *tokens[]) {
+    int pipe_idx = idx_of_pipeline(nr_tokens, tokens);
+
+    int fd[2];
+    if (pipe(fd) < 0) {
+        perror("pipe failed");
+        return -1; // Execution failed
+    }
+
+    pid_t pid = fork();
+    if (pid < 0)    return -1;
+
+    if (pipe_idx < 0) {
+        if (pid == 0) {
+            dup2(fd[0], STDIN_FILENO);
+            close(fd[0]);
+            close(fd[1]);
+            if (execvp(tokens[0], tokens) < 0) {
+                fprintf(stderr, "Unable to execute %s\n", tokens[0]);
+                exit(EXIT_FAILURE);
+            } else exit(EXIT_SUCCESS);
+        }
+        else {
+            close(fd[0]);
+            close(fd[1]);
+            wait(NULL);
+            return 1;
+        }
+    }
+    else {
+        char **command_tokens = NULL;
+        char **next_tokens = split_array(&command_tokens, pipe_idx, tokens);
+
+        if (pid == 0) {
+            // Left child process
+            dup2(fd[1], STDOUT_FILENO);
+            close(fd[0]);
+            close(fd[1]);
+
+            if (execvp(command_tokens[0], command_tokens) < 0) {
+                perror("execvp failed");
+                exit(EXIT_FAILURE);
+            } else exit(EXIT_SUCCESS);
+        }
+        else {
+            // Parent process
+            close(fd[1]);
+            wait(NULL);
+            int stat = execute(nr_tokens - pipe_idx - 1, next_tokens);
+            close(fd[0]);
+            free(command_tokens);
+            return stat;
+        }
+    }
+}
+
 
 /***********************************************************************
  * run_command()
@@ -159,17 +242,7 @@ int run_command(int nr_tokens, char *tokens[]) {
         i += alias->nr_tokens - 1;
     }
 
-    int pid = fork();
-    if (pid < 0) return -1;
-    else if (pid == 0) {
-        if (execvp(tokens[0], tokens) < 0) {
-            fprintf(stderr, "Unable to execute %s\n", tokens[0]);
-            exit(EXIT_FAILURE);
-        } else exit(EXIT_SUCCESS);
-    } else {
-        wait(NULL);
-        return 1;
-    }
+    return execute(nr_tokens, tokens);
 }
 
 
