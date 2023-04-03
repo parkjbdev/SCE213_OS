@@ -117,87 +117,81 @@ int builtin_cd(char *dir) {
     return result;
 }
 
-int idx_of_pipeline(int nr_tokens, char *tokens[]) {
-    for (int i = 0; i < nr_tokens; i++) {
-        if (strcmp(tokens[i], "|") == 0) {
-            return i;
-        }
-    }
-    return -1;
+int count_pipelines(int nr_tokens, char *tokens[]) {
+    int cnt = 0;
+    for (int i = 0; i < nr_tokens; i++)
+        if (strcmp(tokens[i], "|") == 0) cnt++;
+
+    return cnt;
 }
 
-/**
- * split_array
- *
- * @param result left split subarray, length of idx
- * @param idx index to split by
- * @param array array to split
- * @return right split subarray
- */
+typedef struct command {
+    char **tokens;
+    int nr_tokens;
+} Command;
 
-char **split_array(char ***result, int idx, char *array[]) {
-    *result = (char **) malloc(sizeof(char *) * idx);
+typedef struct commands {
+    Command **list;
+    int nr_commands;
+} Commands;
 
-    for (int i = 0; i < idx; i++)
-        (*result)[i] = array[i];
+Commands *parse_commands(int nr_tokens, char *tokens[]) {
+    Commands *commands = (Commands*) malloc(sizeof(Commands));
+    commands->nr_commands = count_pipelines(nr_tokens, tokens) + 1;
+    commands->list = (Command **) malloc(sizeof(Command *) * commands->nr_commands);
 
-    return &array[idx + 1];
+    int command_idx = 0;
+    int pipe_idx1 = 0;
+    int pipe_idx2 = 0;
+
+    for (int i = 0; i < nr_tokens; i++) {
+        Command **command = &commands->list[command_idx];
+        if (!strcmp(tokens[i], "|") || i == nr_tokens - 1) {
+            pipe_idx1 = pipe_idx2 == 0 ? 0 : pipe_idx2 + 1;
+            pipe_idx2 = i != nr_tokens - 1 ? i : nr_tokens;
+            *command = (Command *) malloc(sizeof(Command));
+            (*command)->tokens = (char **) malloc(sizeof(char *) * (pipe_idx2 - pipe_idx1 + 1) + 1);
+            (*command)->nr_tokens = pipe_idx2 - pipe_idx1;
+            for (int j = pipe_idx1; j < pipe_idx2; j++) {
+                (*command)->tokens[j - pipe_idx1] = tokens[j];
+            }
+            (*command)->tokens[pipe_idx2] = NULL;
+            command_idx++;
+        }
+    }
+
+    return commands;
+}
+
+void delete_commands(Commands* target) {
+    for (int i = 0;i < target->nr_commands;i++) {
+        free(target->list[i]->tokens);
+        free(target->list[i]);
+    }
+    free(target->list);
+    free(target);
 }
 
 int execute(int nr_tokens, char *tokens[]) {
-    int pipe_idx = idx_of_pipeline(nr_tokens, tokens);
+    Commands *commands = parse_commands(nr_tokens, tokens);
 
-    int fd[2];
-    if (pipe(fd) < 0) {
-        perror("pipe failed");
-        return -1; // Execution failed
+    pid_t pid;
+    int pipe_fd[2];
+
+    // TODO: Implement pipe execution here
+    for (int i = 0;i < commands->nr_commands;i++) {
+      pid = fork();
+      if  (pid < 0) {
+        delete_commands(commands);
+        exit(EXIT_FAILURE);
+      } else if (pid == 0) {
+
+      } else {
+
+      }
     }
 
-    pid_t pid = fork();
-    if (pid < 0)    return -1;
-
-    if (pipe_idx < 0) {
-        if (pid == 0) {
-            dup2(fd[0], STDIN_FILENO);
-            close(fd[0]);
-            close(fd[1]);
-            if (execvp(tokens[0], tokens) < 0) {
-                fprintf(stderr, "Unable to execute %s\n", tokens[0]);
-                exit(EXIT_FAILURE);
-            } else exit(EXIT_SUCCESS);
-        }
-        else {
-            close(fd[0]);
-            close(fd[1]);
-            wait(NULL);
-            return 1;
-        }
-    }
-    else {
-        char **command_tokens = NULL;
-        char **next_tokens = split_array(&command_tokens, pipe_idx, tokens);
-
-        if (pid == 0) {
-            // Left child process
-            dup2(fd[1], STDOUT_FILENO);
-            close(fd[0]);
-            close(fd[1]);
-
-            if (execvp(command_tokens[0], command_tokens) < 0) {
-                perror("execvp failed");
-                exit(EXIT_FAILURE);
-            } else exit(EXIT_SUCCESS);
-        }
-        else {
-            // Parent process
-            close(fd[1]);
-            wait(NULL);
-            int stat = execute(nr_tokens - pipe_idx - 1, next_tokens);
-            close(fd[0]);
-            free(command_tokens);
-            return stat;
-        }
-    }
+    return -1;
 }
 
 
