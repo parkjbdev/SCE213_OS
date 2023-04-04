@@ -139,6 +139,7 @@ Commands *parse_commands(int nr_tokens, char *tokens[]) {
     Commands *commands = (Commands*) malloc(sizeof(Commands));
     commands->nr_commands = count_pipelines(nr_tokens, tokens) + 1;
     commands->list = (Command **) malloc(sizeof(Command *) * commands->nr_commands);
+    fprintf(stderr, "commands->list malloc allocated size: %d\n", commands->nr_commands);
 
     int command_idx = 0;
     int pipe_idx1 = 0;
@@ -150,7 +151,10 @@ Commands *parse_commands(int nr_tokens, char *tokens[]) {
             pipe_idx1 = pipe_idx2 == 0 ? 0 : pipe_idx2 + 1;
             pipe_idx2 = i != nr_tokens - 1 ? i : nr_tokens;
             *command = (Command *) malloc(sizeof(Command));
-            (*command)->tokens = (char **) malloc(sizeof(char *) * (pipe_idx2 - pipe_idx1 + 1) + 1);
+            fprintf(stderr, "*command malloc allocated\n");
+            fprintf(stderr, "pipe_idx1: %d, pipe_idx2: %d\n", pipe_idx1, pipe_idx2);
+            (*command)->tokens = (char **) malloc(sizeof(char *) * (pipe_idx2 - pipe_idx1 + 2) + 1);
+            fprintf(stderr, "(*command)->tokens malloc allocated\n");
             (*command)->nr_tokens = pipe_idx2 - pipe_idx1;
             for (int j = pipe_idx1; j < pipe_idx2; j++) {
                 (*command)->tokens[j - pipe_idx1] = tokens[j];
@@ -172,23 +176,66 @@ void delete_commands(Commands* target) {
     free(target);
 }
 
+int exec_command(Commands* commands, int idx) {
+  Command *command = commands->list[idx];
+
+  if (execvp(command->tokens[0], command->tokens) < 0) {
+    perror("execvp");
+    fprintf(stderr, "del\n");
+    delete_commands(commands);
+    exit(EXIT_FAILURE);
+  } else {
+    fprintf(stderr, "del\n");
+    delete_commands(commands);
+    exit(EXIT_SUCCESS);
+  }
+}
+
 int execute(int nr_tokens, char *tokens[]) {
     Commands *commands = parse_commands(nr_tokens, tokens);
 
     pid_t pid;
     int pipe_fd[2];
 
+    if (pipe(pipe_fd) < 0) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
     // TODO: Implement pipe execution here
-    for (int i = 0;i < commands->nr_commands;i++) {
+    for (int i = 0;i < commands->nr_commands - 1;i++) {
       pid = fork();
       if  (pid < 0) {
         delete_commands(commands);
         exit(EXIT_FAILURE);
       } else if (pid == 0) {
+        if (i != 0)
+          dup2(pipe_fd[0], STDIN_FILENO);
+        dup2(pipe_fd[1], STDOUT_FILENO);
+        close(pipe_fd[0]); // EOF of pipe read_end
 
+        exec_command(commands, i);
       } else {
-
+        wait(NULL);
+        close(pipe_fd[1]); // EOF of pipe write_end
       }
+    }
+
+    pid = fork();
+
+    if (pid < 0) {
+      delete_commands(commands);
+      exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+      if (commands->nr_commands > 1) {
+        dup2(pipe_fd[0], STDIN_FILENO);
+        close(pipe_fd[0]); // EOF of pipe read_end
+      }
+      exec_command(commands, commands->nr_commands - 1);
+    } else {
+      wait(NULL);
+      delete_commands(commands);
+      return 1;
     }
 
     return -1;
