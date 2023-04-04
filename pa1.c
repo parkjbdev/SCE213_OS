@@ -138,8 +138,8 @@ typedef struct commands {
 Commands *parse_commands(int nr_tokens, char *tokens[]) {
     Commands *commands = (Commands *) malloc(sizeof(Commands));
 
-    commands->list = (Command **) malloc(sizeof(Command *) * commands->nr_commands);
     commands->nr_commands = count_pipelines(nr_tokens, tokens) + 1;
+    commands->list = (Command **) malloc(sizeof(Command *) * commands->nr_commands);
 
     int command_idx = 0;
     int pipe_idx1 = 0;
