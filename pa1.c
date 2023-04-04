@@ -137,29 +137,27 @@ typedef struct commands {
 
 Commands *parse_commands(int nr_tokens, char *tokens[]) {
     Commands *commands = (Commands*) malloc(sizeof(Commands));
-    commands->nr_commands = count_pipelines(nr_tokens, tokens) + 1;
+
     commands->list = (Command **) malloc(sizeof(Command *) * commands->nr_commands);
-    fprintf(stderr, "commands->list malloc allocated size: %d\n", commands->nr_commands);
+    commands->nr_commands = count_pipelines(nr_tokens, tokens) + 1;
 
     int command_idx = 0;
     int pipe_idx1 = 0;
     int pipe_idx2 = 0;
 
     for (int i = 0; i < nr_tokens; i++) {
-        Command **command = &commands->list[command_idx];
         if (!strcmp(tokens[i], "|") || i == nr_tokens - 1) {
             pipe_idx1 = pipe_idx2 == 0 ? 0 : pipe_idx2 + 1;
             pipe_idx2 = i != nr_tokens - 1 ? i : nr_tokens;
-            *command = (Command *) malloc(sizeof(Command));
-            fprintf(stderr, "*command malloc allocated\n");
-            fprintf(stderr, "pipe_idx1: %d, pipe_idx2: %d\n", pipe_idx1, pipe_idx2);
-            (*command)->tokens = (char **) malloc(sizeof(char *) * (pipe_idx2 - pipe_idx1 + 2) + 1);
-            fprintf(stderr, "(*command)->tokens malloc allocated\n");
-            (*command)->nr_tokens = pipe_idx2 - pipe_idx1;
-            for (int j = pipe_idx1; j < pipe_idx2; j++) {
-                (*command)->tokens[j - pipe_idx1] = tokens[j];
+
+            commands->list[command_idx] = (Command *) malloc(sizeof(Command));
+            commands->list[command_idx]->tokens = (char **) malloc(sizeof(char *) * (pipe_idx2 - pipe_idx1 + 1));
+            commands->list[command_idx]->nr_tokens = pipe_idx2 - pipe_idx1;
+            for (int j = 0;j < pipe_idx2 - pipe_idx1;j++) {
+                commands->list[command_idx]->tokens[j] = tokens[j + pipe_idx1];
             }
-            (*command)->tokens[pipe_idx2] = NULL;
+
+            commands->list[command_idx]->tokens[pipe_idx2 - pipe_idx1] = NULL;
             command_idx++;
         }
     }
