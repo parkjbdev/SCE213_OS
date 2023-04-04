@@ -136,7 +136,7 @@ typedef struct commands {
 } Commands;
 
 Commands *parse_commands(int nr_tokens, char *tokens[]) {
-    Commands *commands = (Commands*) malloc(sizeof(Commands));
+    Commands *commands = (Commands *) malloc(sizeof(Commands));
 
     commands->list = (Command **) malloc(sizeof(Command *) * commands->nr_commands);
     commands->nr_commands = count_pipelines(nr_tokens, tokens) + 1;
@@ -153,7 +153,7 @@ Commands *parse_commands(int nr_tokens, char *tokens[]) {
             commands->list[command_idx] = (Command *) malloc(sizeof(Command));
             commands->list[command_idx]->tokens = (char **) malloc(sizeof(char *) * (pipe_idx2 - pipe_idx1 + 1));
             commands->list[command_idx]->nr_tokens = pipe_idx2 - pipe_idx1;
-            for (int j = 0;j < pipe_idx2 - pipe_idx1;j++) {
+            for (int j = 0; j < pipe_idx2 - pipe_idx1; j++) {
                 commands->list[command_idx]->tokens[j] = tokens[j + pipe_idx1];
             }
 
@@ -165,8 +165,8 @@ Commands *parse_commands(int nr_tokens, char *tokens[]) {
     return commands;
 }
 
-void delete_commands(Commands* target) {
-    for (int i = 0;i < target->nr_commands;i++) {
+void delete_commands(Commands *target) {
+    for (int i = 0; i < target->nr_commands; i++) {
         free(target->list[i]->tokens);
         free(target->list[i]);
     }
@@ -174,19 +174,17 @@ void delete_commands(Commands* target) {
     free(target);
 }
 
-int exec_command(Commands* commands, int idx) {
-  Command *command = commands->list[idx];
+int exec_command(Commands *commands, int idx) {
+    Command *command = commands->list[idx];
 
-  if (execvp(command->tokens[0], command->tokens) < 0) {
-    perror("execvp");
-    fprintf(stderr, "del\n");
-    delete_commands(commands);
-    exit(EXIT_FAILURE);
-  } else {
-    fprintf(stderr, "del\n");
-    delete_commands(commands);
-    exit(EXIT_SUCCESS);
-  }
+    if (execvp(command->tokens[0], command->tokens) < 0) {
+        fprintf(stderr, "Unable to execute %s\n", command->tokens[0]);
+        delete_commands(commands);
+        exit(EXIT_FAILURE);
+    } else {
+        delete_commands(commands);
+        exit(EXIT_SUCCESS);
+    }
 }
 
 int execute(int nr_tokens, char *tokens[]) {
@@ -201,39 +199,39 @@ int execute(int nr_tokens, char *tokens[]) {
     }
 
     // TODO: Implement pipe execution here
-    for (int i = 0;i < commands->nr_commands - 1;i++) {
-      pid = fork();
-      if  (pid < 0) {
-        delete_commands(commands);
-        exit(EXIT_FAILURE);
-      } else if (pid == 0) {
-        if (i != 0)
-          dup2(pipe_fd[0], STDIN_FILENO);
-        dup2(pipe_fd[1], STDOUT_FILENO);
-        close(pipe_fd[0]); // EOF of pipe read_end
+    for (int i = 0; i < commands->nr_commands - 1; i++) {
+        pid = fork();
+        if (pid < 0) {
+            delete_commands(commands);
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) {
+            if (i != 0)
+                dup2(pipe_fd[0], STDIN_FILENO);
+            dup2(pipe_fd[1], STDOUT_FILENO);
+            close(pipe_fd[0]); // EOF of pipe read_end
 
-        exec_command(commands, i);
-      } else {
-        wait(NULL);
-        close(pipe_fd[1]); // EOF of pipe write_end
-      }
+            exec_command(commands, i);
+        } else {
+            wait(NULL);
+            close(pipe_fd[1]); // EOF of pipe write_end
+        }
     }
 
     pid = fork();
 
     if (pid < 0) {
-      delete_commands(commands);
-      exit(EXIT_FAILURE);
+        delete_commands(commands);
+        exit(EXIT_FAILURE);
     } else if (pid == 0) {
-      if (commands->nr_commands > 1) {
-        dup2(pipe_fd[0], STDIN_FILENO);
-        close(pipe_fd[0]); // EOF of pipe read_end
-      }
-      exec_command(commands, commands->nr_commands - 1);
+        if (commands->nr_commands > 1) {
+            dup2(pipe_fd[0], STDIN_FILENO);
+            close(pipe_fd[0]); // EOF of pipe read_end
+        }
+        exec_command(commands, commands->nr_commands - 1);
     } else {
-      wait(NULL);
-      delete_commands(commands);
-      return 1;
+        wait(NULL);
+        delete_commands(commands);
+        return 1;
     }
 
     return -1;
