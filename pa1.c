@@ -83,16 +83,27 @@ int builtin_alias_add(char *alias, int argc, char *argv[]) {
     return 1;
 }
 
-int builtin_alias_print() {
-    if (alias_cnt == 0) return 0;
-    for (int i = 0; i < alias_cnt; i++) {
-        fprintf(stderr, "%s:", aliases[i]->alias);
-        for (int j = 0; j < aliases[i]->nr_tokens; j++) {
-            fprintf(stderr, " %s", aliases[i]->tokens[j]);
-        }
-        fprintf(stderr, "\n");
+void print_alias(Alias* alias) {
+    fprintf(stderr, "%s:", alias->alias);
+    for (int i = 0; i < alias->nr_tokens; i++) {
+        fprintf(stderr, " %s", alias->tokens[i]);
     }
-    return 1;
+    fprintf(stderr, "\n");
+}
+
+int builtin_alias_print(char* alias) {
+    if (alias == NULL) {
+        if (alias_cnt == 0) return 0;
+        for (int i = 0; i < alias_cnt; i++) {
+            print_alias(aliases[i]);
+        }
+        return 1;
+    } else {
+        Alias *found = find_alias(alias);
+        if (found == NULL)  return -1;
+        print_alias(found);
+        return 1;
+    }
 }
 
 
@@ -259,8 +270,9 @@ int run_command(int nr_tokens, char *tokens[]) {
         else return -1;
     }
     if (strcmp(tokens[0], "alias") == 0) {
-        if (nr_tokens == 1) return builtin_alias_print();
-        else if (nr_tokens > 2) return builtin_alias_add(tokens[1], nr_tokens - 2, tokens + 2);
+        if (nr_tokens == 1) return builtin_alias_print(NULL);
+        else if (nr_tokens == 2) return builtin_alias_print(tokens[1]);
+        else if (nr_tokens > 3) return builtin_alias_add(tokens[1], nr_tokens - 2, tokens + 2);
         else return -1;
     }
 
