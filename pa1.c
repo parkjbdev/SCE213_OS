@@ -198,7 +198,6 @@ int execute(int nr_tokens, char *tokens[]) {
         exit(EXIT_FAILURE);
     }
 
-    // TODO: Implement pipe execution here
     for (int i = 0; i < commands->nr_commands - 1; i++) {
         pid = fork();
         if (pid < 0) {
