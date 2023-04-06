@@ -19,6 +19,8 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 
+#define MAX_BUFFER 1024
+
 /***********************************************************************
  * builtin_alias
  */
@@ -75,15 +77,12 @@ int builtin_alias_add(char *alias, int argc, char *argv[]) {
     }
     found->nr_tokens = argc;
     found->tokens = (char **) realloc(found->tokens, sizeof(char *) * argc);
-    for (int i = 0; i < argc; i++) {
-        found->tokens[i] = (char *) malloc(sizeof(char) * (strlen(argv[i]) + 1));
-        strcpy(found->tokens[i], argv[i]);
-    }
+    for (int i = 0; i < argc; i++) found->tokens[i] = strdup(argv[i]);
 
     return 1;
 }
 
-void print_alias(Alias* alias) {
+void print_alias(Alias *alias) {
     fprintf(stderr, "%s:", alias->alias);
     for (int i = 0; i < alias->nr_tokens; i++) {
         fprintf(stderr, " %s", alias->tokens[i]);
@@ -91,7 +90,7 @@ void print_alias(Alias* alias) {
     fprintf(stderr, "\n");
 }
 
-int builtin_alias_print(char* alias) {
+int builtin_alias_print(char *alias) {
     if (alias == NULL) {
         if (alias_cnt == 0) return 0;
         for (int i = 0; i < alias_cnt; i++) {
@@ -100,7 +99,7 @@ int builtin_alias_print(char* alias) {
         return 1;
     } else {
         Alias *found = find_alias(alias);
-        if (found == NULL)  return -1;
+        if (found == NULL) return -1;
         print_alias(found);
         return 1;
     }
@@ -121,9 +120,17 @@ int builtin_cd(char *dir) {
         dir = getenv("OLDPWD");
     }
 
+    char old_pwd[255];
+    getcwd(old_pwd, 255);
+
     int result = chdir(dir) == 0 ? 1 : -1;
     if (result < 0) perror("cd");
-    else setenv("OLDPWD", getenv("PWD"), 0);
+    else {
+        char pwd[MAX_BUFFER];
+        getcwd(pwd, MAX_BUFFER);
+        setenv("PWD", pwd, 1);
+        setenv("OLDPWD", old_pwd, 1);
+    }
 
     return result;
 }
@@ -272,7 +279,7 @@ int run_command(int nr_tokens, char *tokens[]) {
     if (strcmp(tokens[0], "alias") == 0) {
         if (nr_tokens == 1) return builtin_alias_print(NULL);
         else if (nr_tokens == 2) return builtin_alias_print(tokens[1]);
-        else if (nr_tokens > 3) return builtin_alias_add(tokens[1], nr_tokens - 2, tokens + 2);
+        else if (nr_tokens > 2) return builtin_alias_add(tokens[1], nr_tokens - 2, tokens + 2);
         else return -1;
     }
 
