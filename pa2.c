@@ -56,8 +56,7 @@ extern bool quiet;
  *   The current implementation serves the resource in the requesting order
  *   without considering the priority. See the comments in sched.h
  ***********************************************************************/
-static bool fcfs_acquire(int resource_id)
-{
+static bool fcfs_acquire(int resource_id) {
 	struct resource *r = resources + resource_id;
 
 	if (!r->owner) {
@@ -91,8 +90,7 @@ static bool fcfs_acquire(int resource_id)
  *   The current implementation serves the resource in the requesting order
  *   without considering the priority. See the comments in sched.h
  ***********************************************************************/
-static void fcfs_release(int resource_id)
-{
+static void fcfs_release(int resource_id) {
 	struct resource *r = resources + resource_id;
 
 	/* Ensure that the owner process is releasing the resource */
@@ -134,17 +132,14 @@ static void fcfs_release(int resource_id)
 /***********************************************************************
  * FIFO scheduler
  ***********************************************************************/
-static int fifo_initialize(void)
-{
+static int fifo_initialize(void) {
 	return 0;
 }
 
-static void fifo_finalize(void)
-{
+static void fifo_finalize(void) {
 }
 
-static struct process *fifo_schedule(void)
-{
+static struct process *fifo_schedule(void) {
 	struct process *next = NULL;
 
 	/* You may inspect the situation by calling dump_status() at any time */
@@ -177,7 +172,7 @@ pick_next:
 		next = list_first_entry(&readyqueue, struct process, list);
 
 		/**
-		 * Detach the process from the ready queue. Note that we use 
+		 * Detach the process from the ready queue. Note that we use
 		 * list_del_init() over list_del() to maintain the list head tidy.
 		 * Otherwise, the framework will complain (assert) on process exit.
 		 */
@@ -200,8 +195,7 @@ struct scheduler fifo_scheduler = {
 /***********************************************************************
  * SJF scheduler
  ***********************************************************************/
-static struct process *sjf_schedule(void)
-{
+static struct process *sjf_schedule(void) {
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
@@ -210,11 +204,11 @@ static struct process *sjf_schedule(void)
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
-	.acquire = fcfs_acquire,	/* Use the default FCFS acquire() */
-	.release = fcfs_release,	/* Use the default FCFS release() */
-	.schedule = NULL,			/* TODO: Assign your schedule function  
-								   to this function pointer to activate
-								   SJF in the simulation system */
+	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
+	.release = fcfs_release, /* Use the default FCFS release() */
+	.schedule = NULL,		 /* TODO: Assign your schedule function
+								to this function pointer to activate
+								SJF in the simulation system */
 };
 
 /***********************************************************************
