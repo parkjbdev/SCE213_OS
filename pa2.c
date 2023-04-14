@@ -24,7 +24,7 @@
  * The process which is currently running
  */
 #include "process.h"
-extern struct process *current;
+extern struct process* current;
 
 /**
  * List head to hold the processes ready to run
@@ -56,8 +56,9 @@ extern bool quiet;
  *   The current implementation serves the resource in the requesting order
  *   without considering the priority. See the comments in sched.h
  ***********************************************************************/
-static bool fcfs_acquire(int resource_id) {
-	struct resource *r = resources + resource_id;
+static bool fcfs_acquire(int resource_id)
+{
+	struct resource* r = resources + resource_id;
 
 	if (!r->owner) {
 		/* This resource is not owned by any one. Take it! */
@@ -90,8 +91,9 @@ static bool fcfs_acquire(int resource_id) {
  *   The current implementation serves the resource in the requesting order
  *   without considering the priority. See the comments in sched.h
  ***********************************************************************/
-static void fcfs_release(int resource_id) {
-	struct resource *r = resources + resource_id;
+static void fcfs_release(int resource_id)
+{
+	struct resource* r = resources + resource_id;
 
 	/* Ensure that the owner process is releasing the resource */
 	assert(r->owner == current);
@@ -101,7 +103,7 @@ static void fcfs_release(int resource_id) {
 
 	/* Let's wake up ONE waiter (if exists) that came first */
 	if (!list_empty(&r->waitqueue)) {
-		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
+		struct process* waiter = list_first_entry(&r->waitqueue, struct process, list);
 
 		/**
 		 * Ensure the waiter is in the wait status
@@ -132,15 +134,13 @@ static void fcfs_release(int resource_id) {
 /***********************************************************************
  * FIFO scheduler
  ***********************************************************************/
-static int fifo_initialize(void) {
-	return 0;
-}
+static int fifo_initialize(void) { return 0; }
 
-static void fifo_finalize(void) {
-}
+static void fifo_finalize(void) { }
 
-static struct process *fifo_schedule(void) {
-	struct process *next = NULL;
+static struct process* fifo_schedule(void)
+{
+	struct process* next = NULL;
 
 	/* You may inspect the situation by calling dump_status() at any time */
 	// dump_status();
@@ -195,29 +195,90 @@ struct scheduler fifo_scheduler = {
 /***********************************************************************
  * SJF scheduler
  ***********************************************************************/
-static struct process *sjf_schedule(void) {
-	/**
-	 * Implement your own SJF scheduler here.
-	 */
-	return NULL;
+static struct process* sjf_schedule(void)
+{
+  // dump_status();
+	struct process* next = NULL;
+	if (current && current->age < current->lifespan)
+		return current;
+	else {
+		if (!list_empty(&readyqueue)) {
+			// Find Shortest Job from Queue
+			next = list_first_entry(&readyqueue, struct process, list);
+			struct process* p = NULL;
+			list_for_each_entry(p, &readyqueue, list)
+			{
+				if (p->lifespan < next->lifespan)
+					next = p;
+			}
+		}
+    if (!current || current->status == PROCESS_BLOCKED) {
+      list_del_init(&next->list);
+      return next;
+    }
+		else {
+			if (next == NULL)
+				return NULL;
+			list_del_init(&next->list);
+			return next;
+		}
+	}
 }
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-	.schedule = NULL,		 /* TODO: Assign your schedule function
-								to this function pointer to activate
-								SJF in the simulation system */
+	.schedule = sjf_schedule, /* TODO: Assign your schedule function
+                               to this function pointer to activate
+                               SJF in the simulation system */
 };
 
 /***********************************************************************
  * STCF scheduler
  ***********************************************************************/
+static struct process* stcf_schedule(void)
+{
+	// if no job is ready in queue, return current process
+	if (list_empty(&readyqueue)) {
+		if (current->age < current->lifespan)
+			return current;
+		else
+		return NULL;
+	}
+
+	// Find STC Process
+	struct process* sj_in_readyqueue = list_first_entry_or_null(&readyqueue, struct process, list);
+	struct process* p = NULL;
+	list_for_each_entry(p, &readyqueue, list)
+	{
+		if (sj_in_readyqueue && p->lifespan - p->age < sj_in_readyqueue->lifespan - sj_in_readyqueue->age)
+			sj_in_readyqueue = p;
+	}
+
+	if (!current || current->status == PROCESS_BLOCKED) {
+		list_del_init(&sj_in_readyqueue->list);
+		return sj_in_readyqueue;
+	}
+  
+	if (sj_in_readyqueue->lifespan - sj_in_readyqueue->age < current->lifespan - current->age) {
+		list_del_init(&sj_in_readyqueue->list);
+		return sj_in_readyqueue;
+	} else {
+		if (current->age < current->lifespan)
+			return current;
+		else {
+			list_del_init(&sj_in_readyqueue->list);
+			return sj_in_readyqueue;
+		}
+	}
+}
+
 struct scheduler stcf_scheduler = {
 	.name = "Shortest Time-to-Complete First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
+	.schedule = stcf_schedule,
 
 	/* You need to check the newly created processes to implement STCF.
 	 * Have a look at @forked() callback.
@@ -278,3 +339,4 @@ struct scheduler pip_scheduler = {
 	 * Ditto
 	 */
 };
+
