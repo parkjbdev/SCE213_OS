@@ -62,6 +62,7 @@ struct resource_schedule {
 static LIST_HEAD(__forkqueue);
 
 bool quiet = false;
+bool dump = false;
 
 static const char *__process_status_sz[] = {
 	"RDY",
@@ -332,6 +333,7 @@ static void __do_simulation(void)
 
 		/* Ask scheduler to pick the next process to run */
 		prev = current;
+		if (dump)	dump_status();
 		current = sched->schedule();
 
 		/* If the system has run a process in the previous tick */
@@ -424,7 +426,8 @@ static void __print_usage(char *const name)
 {
 	printf("Usage: %s {-q} -[f|s|S|r|a|p|i] [process script file]\n", name);
 	printf("\n");
-	printf("  -q: Run quietly\n\n");
+	printf("  -q: Run quietly\n");
+	printf("  -d: Dump Status\n\n");
 	printf("  -f: Use FIFO scheduler (default)\n");
 	printf("  -s: Use SJF scheduler\n");
 	printf("  -S: Use STCF scheduler\n");
@@ -441,10 +444,13 @@ int main(int argc, char *const argv[])
 	int opt;
 	char *scriptfile;
 
-	while ((opt = getopt(argc, argv, "qfsSrpaich")) != -1) {
+	while ((opt = getopt(argc, argv, "qdfsSrpaich")) != -1) {
 		switch (opt) {
 		case 'q':
 			quiet = true;
+			break;
+		case 'd':
+			dump = true;
 			break;
 
 		case 'f':
