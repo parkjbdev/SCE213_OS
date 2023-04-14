@@ -47,6 +47,8 @@ extern unsigned int ticks;
  */
 extern bool quiet;
 
+bool ticks_left(struct process* p) { return p->lifespan - p->age; }
+
 /***********************************************************************
  * Default FCFS resource acquision function
  *
@@ -197,9 +199,8 @@ struct scheduler fifo_scheduler = {
  ***********************************************************************/
 static struct process* sjf_schedule(void)
 {
-  // dump_status();
 	struct process* next = NULL;
-	if (current && current->age < current->lifespan)
+	if (current && ticks_left(current) > 0)
 		return current;
 	else {
 		if (!list_empty(&readyqueue)) {
@@ -212,11 +213,10 @@ static struct process* sjf_schedule(void)
 					next = p;
 			}
 		}
-    if (!current || current->status == PROCESS_BLOCKED) {
-      list_del_init(&next->list);
-      return next;
-    }
-		else {
+		if (!current || current->status == PROCESS_BLOCKED) {
+			list_del_init(&next->list);
+			return next;
+		} else {
 			if (next == NULL)
 				return NULL;
 			list_del_init(&next->list);
@@ -230,8 +230,8 @@ struct scheduler sjf_scheduler = {
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
 	.schedule = sjf_schedule, /* TODO: Assign your schedule function
-                               to this function pointer to activate
-                               SJF in the simulation system */
+							   to this function pointer to activate
+							   SJF in the simulation system */
 };
 
 /***********************************************************************
@@ -241,35 +241,36 @@ static struct process* stcf_schedule(void)
 {
 	// if no job is ready in queue, return current process
 	if (list_empty(&readyqueue)) {
-		if (current->age < current->lifespan)
+		if (ticks_left(current) > 0)
 			return current;
 		else
-		return NULL;
+			return NULL;
 	}
 
 	// Find STC Process
-	struct process* sj_in_readyqueue = list_first_entry_or_null(&readyqueue, struct process, list);
+	struct process* stc = list_first_entry_or_null(&readyqueue, struct process, list);
 	struct process* p = NULL;
 	list_for_each_entry(p, &readyqueue, list)
 	{
-		if (sj_in_readyqueue && p->lifespan - p->age < sj_in_readyqueue->lifespan - sj_in_readyqueue->age)
-			sj_in_readyqueue = p;
+		if (stc && ticks_left(p) < ticks_left(stc))
+			stc = p;
 	}
 
 	if (!current || current->status == PROCESS_BLOCKED) {
-		list_del_init(&sj_in_readyqueue->list);
-		return sj_in_readyqueue;
+		list_del_init(&stc->list);
+		return stc;
 	}
-  
-	if (sj_in_readyqueue->lifespan - sj_in_readyqueue->age < current->lifespan - current->age) {
-		list_del_init(&sj_in_readyqueue->list);
-		return sj_in_readyqueue;
+
+	if (ticks_left(stc) < ticks_left(current)) {
+		list_add(&current->list, &readyqueue);
+		list_del_init(&stc->list);
+		return stc;
 	} else {
-		if (current->age < current->lifespan)
+		if (ticks_left(current) > 0)
 			return current;
 		else {
-			list_del_init(&sj_in_readyqueue->list);
-			return sj_in_readyqueue;
+			list_del_init(&stc->list);
+			return stc;
 		}
 	}
 }
@@ -339,4 +340,3 @@ struct scheduler pip_scheduler = {
 	 * Ditto
 	 */
 };
-
