@@ -213,15 +213,10 @@ static struct process* sjf_schedule(void)
 					next = p;
 			}
 		}
-		if (!current || current->status == PROCESS_BLOCKED) {
-			list_del_init(&next->list);
-			return next;
-		} else {
-			if (next == NULL)
-				return NULL;
-			list_del_init(&next->list);
-			return next;
-		}
+		if (next == NULL)
+			return NULL;
+		list_del_init(&next->list);
+		return next;
 	}
 }
 
@@ -252,7 +247,7 @@ static struct process* stcf_schedule(void)
 	struct process* p = NULL;
 	list_for_each_entry(p, &readyqueue, list)
 	{
-		if (stc && ticks_left(p) < ticks_left(stc))
+		if (!stc || ticks_left(p) < ticks_left(stc))
 			stc = p;
 	}
 
@@ -291,10 +286,26 @@ struct scheduler stcf_scheduler = {
 /***********************************************************************
  * Round-robin scheduler
  ***********************************************************************/
+static struct process* rr_schedule(void)
+{
+	struct process* next = list_empty(&readyqueue) ? NULL : list_first_entry_or_null(&readyqueue, struct process, list);
+	bool current_uncompleted = current && current->status != PROCESS_BLOCKED && ticks_left(current) > 0;
+
+	if (next == NULL)
+		return current_uncompleted ? current : NULL;
+
+	if (current_uncompleted)
+		list_add_tail(&current->list, &readyqueue);
+
+	list_del_init(&next->list);
+	return next;
+}
+
 struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
+	.schedule = rr_schedule,
 
 	/* Obviously, ... */
 };
