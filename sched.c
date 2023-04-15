@@ -128,7 +128,7 @@ void dump_status(void)
 	do {                                      \
 		fprintf(stderr, "%3d: ", ticks);      \
 		for (unsigned int i = 0; i < pid; i++) {       \
-			fprintf(stderr, "    ");          \
+			fprintf(stderr, "\t");          \
 		}                                     \
 		fprintf(stderr, string "\n", ##args); \
 	} while (0);
@@ -387,6 +387,7 @@ static void __do_simulation(void)
 
 		/* Increase the tick counter */
 		ticks++;
+		fprintf(stderr, "-----------------------------------------------\n");
 	}
 }
 
