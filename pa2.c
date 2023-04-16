@@ -47,7 +47,7 @@ extern unsigned int ticks;
  */
 extern bool quiet;
 
-bool ticks_left(struct process* p) { return p->lifespan - p->age; }
+int ticks_left(struct process* p) { return p->lifespan - p->age; }
 
 /***********************************************************************
  * Default FCFS resource acquision function
@@ -313,8 +313,67 @@ struct scheduler rr_scheduler = {
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
+static bool prio_acquire(int resource_id)
+{
+	struct resource* r = resources + resource_id;
+
+	/* If the resource is not owned by anyone, just acquire it */
+	if (!r->owner) {
+		r->owner = current;
+		return true;
+	}
+
+	/* If the resource is owned by someone, check the priority */
+	if (r->owner->prio < current->prio) {
+		/* Priority: owner < current => preempt */
+		r->owner->status = PROCESS_BLOCKED;
+		list_add_tail(&r->owner->list, &readyqueue);
+		r->owner = current;
+		return true;
+	} else {
+		/* Priority: owner >= current => wait */
+		current->status = PROCESS_BLOCKED;
+		list_add_tail(&current->list, &r->waitqueue);
+		return false;
+	}
+}
+
+static void prio_release(int resource_id)
+{
+	struct resource* r = resources + resource_id;
+
+	assert(r->owner == current);
+	r->owner = NULL;
+
+	if (list_empty(&r->waitqueue))
+		return;
+
+	/* Find the highest priority process in the wait queue */
+	struct process* waiter = list_first_entry(&r->waitqueue, struct process, list);
+	struct process* p = NULL;
+	list_for_each_entry(p, &r->waitqueue, list)
+	{
+		if (p->prio > waiter->prio)
+			waiter = p;
+	}
+
+	list_del_init(&waiter->list);
+	waiter->status = PROCESS_READY;
+	list_add_tail(&waiter->list, &readyqueue);
+}
+
+static struct process* prio_schedule(void)
+{
+	/**
+	 * Implement your own schedule function to make the priority scheduler
+	 * correct.
+	 */
+
+	return NULL;
+}
+
 struct scheduler prio_scheduler = {
-	.name = "Priority",
+	.name = "Priority", .acquire = prio_acquire, .release = prio_release, .schedule = rr_schedule,
 	/**
 	 * Implement your own acqure/release function to make the priority
 	 * scheduler correct.
