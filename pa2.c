@@ -327,7 +327,7 @@ static bool prio_acquire(int resource_id)
 	if (r->owner->prio < current->prio) {
 		/* Priority: owner < current => preempt */
 		r->owner->status = PROCESS_BLOCKED;
-		list_add_tail(&r->owner->list, &readyqueue);
+		list_add_tail(&r->owner->list, &r->waitqueue);
 		r->owner = current;
 		return true;
 	} else {
@@ -357,6 +357,8 @@ static void prio_release(int resource_id)
 			waiter = p;
 	}
 
+  assert(waiter->status == PROCESS_BLOCKED);
+
 	list_del_init(&waiter->list);
 	waiter->status = PROCESS_READY;
 	list_add_tail(&waiter->list, &readyqueue);
@@ -368,12 +370,47 @@ static struct process* prio_schedule(void)
 	 * Implement your own schedule function to make the priority scheduler
 	 * correct.
 	 */
+  // List is Empty
+  if (list_empty(&readyqueue)) {
+    if (ticks_left(current) > 0)
+      return current;
+    else
+      return NULL;
+  }
 
-	return NULL;
+  // List is not empty
+  // Find the highest priority process
+  struct process *next = list_first_entry(&readyqueue, struct process, list);
+  struct process *p = NULL;
+  list_for_each_entry(p, &readyqueue, list) {
+    if (!next || p->prio > next->prio) {
+      next = p;
+    }
+  }
+  if (!current || current->status == PROCESS_BLOCKED) {
+    list_del_init(&next->list);
+    return next;
+  }
+  // Compare the priority
+  if (next->prio > current->prio) {
+    // Preempt
+    list_add_tail(&current->list, &readyqueue);
+    list_del_init(&next->list);
+    return next;
+  } 
+  else {
+    // Wait
+    if (ticks_left(current) > 0)
+      return current;
+    else {
+      list_del_init(&next->list);
+      return next;
+    }
+  }
 }
 
 struct scheduler prio_scheduler = {
-	.name = "Priority", .acquire = prio_acquire, .release = prio_release, .schedule = rr_schedule,
+	.name = "Priority", .acquire = prio_acquire, .release = prio_release, .schedule = prio_schedule,
 	/**
 	 * Implement your own acqure/release function to make the priority
 	 * scheduler correct.
