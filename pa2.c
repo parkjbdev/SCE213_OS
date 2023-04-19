@@ -361,19 +361,23 @@ static bool prio_acquire(int resource_id)
 			r->owner->status = PROCESS_BLOCKED;
 			list_add_tail_safe(&r->owner->list, &r->waitqueue);
 		}
-
+		// Just for safety
+		assert(list_empty(&current->list));
 		r->owner = current;
 		return true;
 	} else {
 		current->status = PROCESS_BLOCKED;
 		list_add_tail_safe(&current->list, &r->waitqueue);
+		// Just for safety
+		assert(list_empty(&highest_prio->list));
+		r->owner = highest_prio;
+
 		return false;
 	}
 }
 
 static void prio_release(int resource_id)
 {
-	assert(ticks < 50);
 	struct resource* r = resources + resource_id;
 	// Could be NULL if the process is preempted before, therefore r->owner could already be NULL
 	//	assert(r->owner == current);
@@ -395,7 +399,6 @@ static void prio_release(int resource_id)
 
 	list_del_init(&waiter->list);
 	waiter->status = PROCESS_READY;
-//	assert(list_empty(&waiter->list));
 	list_add_safe(&waiter->list, &readyqueue);
 }
 
@@ -405,7 +408,6 @@ static struct process* prio_schedule(void)
 	 * Implement your own schedule function to make the priority scheduler
 	 * correct.
 	 */
-	assert(ticks < 50);
 	// List is Empty
 	if (list_empty(&readyqueue)) {
 		assert(list_empty(&current->list));
@@ -424,47 +426,43 @@ static struct process* prio_schedule(void)
 	}
 
 	if (!current || current->status == PROCESS_BLOCKED) {
-		assert(highest_prio->status == PROCESS_READY);
 		list_del_init(&highest_prio->list);
-		assert(list_empty(&highest_prio->list));
 		return highest_prio;
 	}
 
+	assert(list_empty(&current->list));
+
 	// Compare the priority
-	if (highest_prio->prio > current->prio) {
+	if (highest_prio->prio >= current->prio) {
 		// Preempt
+		// Force Release Resource if current is preempted
+		for (int i = 0; i < NR_RESOURCES; i++) {
+			struct resource* r = resources + i;
+			if (r->owner == current)
+				r->owner = NULL;
+		}
+		// Bug Fix
+		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue even though process is
+		// completed
+		if (ticks_left(current) > 0)
+			list_add_tail_safe(&current->list, &readyqueue);
 		list_del_init(&highest_prio->list);
-		assert(list_empty(&current->list));
-		//		list_del_init(&current->list);
-		//		list_add_tail(&current->list, &readyqueue);
-		assert(list_empty(&highest_prio->list));
 		return highest_prio;
 	} else {
-		assert(list_empty(&current->list));
-		//		return current;
-		//		return ticks_left(current) > 0 ? current : ;
 		if (ticks_left(current) > 0)
 			return current;
 		else {
 			list_del_init(&highest_prio->list);
-			assert(list_empty(&highest_prio->list));
 			return highest_prio;
 		}
 	}
 }
-
 
 struct scheduler prio_scheduler = {
 	.name = "Priority",
 	.acquire = prio_acquire,
 	.release = prio_release,
 	.schedule = prio_schedule,
-
-	/**
-	 * Implement your own acqure/release function to make the priority
-	 * scheduler correct.
-	 */
-	/* Implement your own prio_schedule() and attach it here */
 };
 
 /***********************************************************************

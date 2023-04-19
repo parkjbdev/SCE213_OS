@@ -88,3 +88,25 @@ code above which should be at 348 line (after assertion) is integrated by initia
 - [ ] Priority scheduler + aging: 100pts (`prio`)
 - [ ] Priority scheduler + PCP: 70pts (`resources-basic`)
 - [ ] Priority scheduler + PIP: 150pts (`resources-adv1` and `resources-adv2`)
+
+# 0419
+## Priority Scheduler Policy Update
+- Implemented Round Robin Scheduling when there are processes with same priority
+- Bugfix & Passed all testcases 
+
+## BugFix
+- Force release resources when process is preempted by higher priority process
+- Check if `ticks_left() > 0` before returning from `prio_schedule()` 
+
+## Minor Changes
+- list_add_safe and list_add_tail_safe are now force adding list_head to the list
+
+## Testcase Status
+
+- [X] testcases/single
+- [X] testcases/multi
+- [X] testcases/prio
+- [X] testcases/resources-basic
+- [X] testcases/resources-prio
+- [X] testcases/resources-adv1
+- [X] testcases/resources-adv2
