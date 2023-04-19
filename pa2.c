@@ -548,27 +548,24 @@ static struct process* pa_schedule(void)
 
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging", .acquire = prio_acquire, .release = prio_release, .schedule = pa_schedule,
-	/**
-	 * Ditto
-	 */
 };
 
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
+
+static struct process* pcp_schedule(void) { return NULL; }
+
 struct scheduler pcp_scheduler = {
-	.name = "Priority + PCP Protocol",
-	/**
-	 * Ditto
-	 */
+	.name = "Priority + PCP Protocol", .acquire = prio_acquire, .release = prio_release, .schedule = pcp_schedule,
 };
 
 /***********************************************************************
  * Priority scheduler with priority inheritance protocol
  ***********************************************************************/
+
+static struct process* pip_schedule(void) { return NULL; }
+
 struct scheduler pip_scheduler = {
-	.name = "Priority + PIP Protocol",
-	/**
-	 * Ditto
-	 */
+	.name = "Priority + PIP Protocol", .acquire = prio_acquire, .release = prio_release, .schedule = pip_schedule
 };
