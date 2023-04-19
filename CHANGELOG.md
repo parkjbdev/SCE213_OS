@@ -110,3 +110,8 @@ code above which should be at 348 line (after assertion) is integrated by initia
 - [X] testcases/resources-prio
 - [X] testcases/resources-adv1
 - [X] testcases/resources-adv2
+
+# 0419
+## Priority Aging Scheduler Implementation
+- Defined `prio_aging_except` function
+- [Link to Diffcheck Results between priority & pa](https://www.diffchecker.com/P226p6IR/)

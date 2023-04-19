@@ -468,8 +468,86 @@ struct scheduler prio_scheduler = {
 /***********************************************************************
  * Priority scheduler with aging
  ***********************************************************************/
+
+static void prio_aging_except(struct process* except)
+{
+	struct process* p = NULL;
+	list_for_each_entry(p, &readyqueue, list)
+	{
+		if (p != except) {
+			p->prio++;
+			if (!quiet)
+				fprintf(stderr, "Aging priority %d from %d to %d\n", p->pid, p->prio_orig, p->prio);
+		}
+	}
+}
+
+static struct process* pa_schedule(void)
+{
+	/**
+	 * Implement your own schedule function to make the priority scheduler
+	 * correct.
+	 */
+	// List is Empty
+	if (list_empty(&readyqueue)) {
+		assert(list_empty(&current->list));
+		if (ticks_left(current) > 0) {
+			prio_aging_except(current);
+			return current;
+		} else
+			return NULL;
+	}
+
+	// List is not empty
+	// Find the highest priority process
+	struct process* highest_prio = list_first_entry(&readyqueue, struct process, list);
+	struct process* p = NULL;
+	list_for_each_entry(p, &readyqueue, list)
+	{
+		if (p->prio > highest_prio->prio) {
+			highest_prio = p;
+		}
+	}
+
+	if (!current || current->status == PROCESS_BLOCKED) {
+		list_del_init(&highest_prio->list);
+		prio_aging_except(current);
+		return highest_prio;
+	}
+
+	assert(list_empty(&current->list));
+
+	// Compare the priority
+	if (highest_prio->prio >= current->prio) {
+		// Preempt
+		// Force Release Resource if current is preempted
+		for (int i = 0; i < NR_RESOURCES; i++) {
+			struct resource* r = resources + i;
+			if (r->owner == current)
+				r->owner = NULL;
+		}
+		// Bug Fix
+		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue even though process is
+		// completed
+		if (ticks_left(current) > 0)
+			list_add_tail_safe(&current->list, &readyqueue);
+		list_del_init(&highest_prio->list);
+		prio_aging_except(current);
+		return highest_prio;
+	} else {
+		if (ticks_left(current) > 0) {
+			prio_aging_except(current);
+			return current;
+		} else {
+			list_del_init(&highest_prio->list);
+			prio_aging_except(current);
+			return highest_prio;
+		}
+	}
+}
+
 struct scheduler pa_scheduler = {
-	.name = "Priority + aging",
+	.name = "Priority + aging", .acquire = prio_acquire, .release = prio_release, .schedule = pa_schedule,
 	/**
 	 * Ditto
 	 */
