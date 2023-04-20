@@ -47,6 +47,33 @@ extern unsigned int ticks;
  */
 extern bool quiet;
 
+#define SMALLEST (-1)
+#define LARGEST 1
+#define EQUAL 0
+
+struct process* find_process(int condition, int (*comparator)(struct process*))
+{
+	struct process* result = NULL;
+	if (!list_empty(&readyqueue)) {
+		result = list_first_entry(&readyqueue, struct process, list);
+		struct process* pos = NULL;
+		list_for_each_entry(pos, &readyqueue, list)
+		{
+			if (condition < 0) {
+				if (comparator(pos) < comparator(result))
+					result = pos;
+			} else if (condition > 0) {
+				if (comparator(pos) > comparator(result))
+					result = pos;
+			} else {
+				if (comparator(pos) == comparator(result))
+					result = pos;
+			}
+		}
+	}
+	return result;
+}
+
 struct process* rqueue(int idx)
 {
 	struct list_head* pos = (&readyqueue)->next;
@@ -219,26 +246,18 @@ struct scheduler fifo_scheduler = {
 /***********************************************************************
  * SJF scheduler
  ***********************************************************************/
+int lifespan(struct process* p) { return p->lifespan; }
+
 static struct process* sjf_schedule(void)
 {
-	struct process* next = NULL;
 	if (current && ticks_left(current) > 0)
 		return current;
 	else {
-		if (!list_empty(&readyqueue)) {
-			// Find Shortest Job from Queue
-			next = list_first_entry(&readyqueue, struct process, list);
-			struct process* p = NULL;
-			list_for_each_entry(p, &readyqueue, list)
-			{
-				if (p->lifespan < next->lifespan)
-					next = p;
-			}
-		}
-		if (next == NULL)
+		struct process* sj = find_process(SMALLEST, lifespan);
+		if (sj == NULL)
 			return NULL;
-		list_del_init(&next->list);
-		return next;
+		list_del_init(&sj->list);
+		return sj;
 	}
 }
 
@@ -258,20 +277,11 @@ static struct process* stcf_schedule(void)
 {
 	// if no job is ready in queue, return current process
 	if (list_empty(&readyqueue)) {
-		if (ticks_left(current) > 0)
-			return current;
-		else
-			return NULL;
+		return ticks_left(current) > 0 ? current : NULL;
 	}
 
 	// Find STC Process
-	struct process* stc = list_first_entry_or_null(&readyqueue, struct process, list);
-	struct process* p = NULL;
-	list_for_each_entry(p, &readyqueue, list)
-	{
-		if (!stc || ticks_left(p) < ticks_left(stc))
-			stc = p;
-	}
+	struct process* stc = find_process(SMALLEST, ticks_left);
 
 	if (!current || current->status == PROCESS_BLOCKED) {
 		list_del_init(&stc->list);
@@ -335,6 +345,9 @@ struct scheduler rr_scheduler = {
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
+
+int prio(struct process* p) { return p->prio; }
+
 static bool prio_acquire(int resource_id)
 {
 	struct resource* r = resources + resource_id;
@@ -348,13 +361,9 @@ static bool prio_acquire(int resource_id)
 	assert(list_empty(&r->owner->list));
 
 	// Find Highest Priority Process
-	struct process* highest_prio = r->owner;
-	struct process* pos = NULL;
-	list_for_each_entry(pos, &r->waitqueue, list)
-	{
-		if (pos->prio > highest_prio->prio)
-			highest_prio = pos;
-	}
+	struct process* highest_prio = find_process(LARGEST, prio);
+	if (highest_prio == NULL || highest_prio->prio < r->owner->prio)
+		highest_prio = r->owner;
 
 	if (current->prio > highest_prio->prio) {
 		if (highest_prio == r->owner) {
@@ -387,13 +396,7 @@ static void prio_release(int resource_id)
 		return;
 
 	/* Find the highest priority process in the wait queue */
-	struct process* waiter = list_first_entry(&r->waitqueue, struct process, list);
-	struct process* p = NULL;
-	list_for_each_entry(p, &r->waitqueue, list)
-	{
-		if (p->prio > waiter->prio)
-			waiter = p;
-	}
+	struct process* waiter = find_process(LARGEST, prio);
 
 	assert(waiter->status == PROCESS_BLOCKED);
 
@@ -416,14 +419,7 @@ static struct process* prio_schedule(void)
 
 	// List is not empty
 	// Find the highest priority process
-	struct process* highest_prio = list_first_entry(&readyqueue, struct process, list);
-	struct process* p = NULL;
-	list_for_each_entry(p, &readyqueue, list)
-	{
-		if (p->prio > highest_prio->prio) {
-			highest_prio = p;
-		}
-	}
+	struct process* highest_prio = find_process(LARGEST, prio);
 
 	if (!current || current->status == PROCESS_BLOCKED) {
 		list_del_init(&highest_prio->list);
@@ -500,14 +496,7 @@ static struct process* pa_schedule(void)
 
 	// List is not empty
 	// Find the highest priority process
-	struct process* highest_prio = list_first_entry(&readyqueue, struct process, list);
-	struct process* p = NULL;
-	list_for_each_entry(p, &readyqueue, list)
-	{
-		if (p->prio > highest_prio->prio) {
-			highest_prio = p;
-		}
-	}
+	struct process* highest_prio = find_process(LARGEST, prio);
 
 	if (!current || current->status == PROCESS_BLOCKED) {
 		list_del_init(&highest_prio->list);
@@ -547,25 +536,42 @@ static struct process* pa_schedule(void)
 }
 
 struct scheduler pa_scheduler = {
-	.name = "Priority + aging", .acquire = prio_acquire, .release = prio_release, .schedule = pa_schedule,
+	.name = "Priority + aging",
+	.acquire = prio_acquire,
+	.release = prio_release,
+	.schedule = pa_schedule,
 };
 
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
 
-static struct process* pcp_schedule(void) { return NULL; }
+static struct process* pcp_schedule(void)
+{
+	assert(ticks < 1000);
+	return NULL;
+}
 
 struct scheduler pcp_scheduler = {
-	.name = "Priority + PCP Protocol", .acquire = prio_acquire, .release = prio_release, .schedule = pcp_schedule,
+	.name = "Priority + PCP Protocol",
+	.acquire = prio_acquire,
+	.release = prio_release,
+	.schedule = pcp_schedule,
 };
 
 /***********************************************************************
  * Priority scheduler with priority inheritance protocol
  ***********************************************************************/
 
-static struct process* pip_schedule(void) { return NULL; }
+static struct process* pip_schedule(void)
+{
+	assert(ticks < 1000);
+	return NULL;
+}
 
 struct scheduler pip_scheduler = {
-	.name = "Priority + PIP Protocol", .acquire = prio_acquire, .release = prio_release, .schedule = pip_schedule
+	.name = "Priority + PIP Protocol",
+	.acquire = prio_acquire,
+	.release = prio_release,
+	.schedule = pip_schedule,
 };

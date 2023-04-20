@@ -113,12 +113,12 @@ code above which should be at 348 line (after assertion) is integrated by initia
 - [X] testcases/resources-adv1
 - [X] testcases/resources-adv2
 
-# 0419
-## Priority Aging Scheduler Implementation
+## 0419
+### Priority Aging Scheduler Implementation
 - Defined `prio_aging_except` function
 - [Link to Diffcheck Results between priority & pa](https://www.diffchecker.com/P226p6IR/)
 
-## TODO
+### TODO
 
 - [X] SJF scheduler: 20pts (tested using `multi`)
 - [X] STCF scheduler: 50pts (`multi`)
@@ -127,3 +127,8 @@ code above which should be at 348 line (after assertion) is integrated by initia
 - [X] Priority scheduler + aging: 100pts (`prio`)
 - [ ] Priority scheduler + PCP: 70pts (`resources-basic`)
 - [ ] Priority scheduler + PIP: 150pts (`resources-adv1` and `resources-adv2`)
+
+# 0420
+## Add Test Automation Scripts
+## Refactor
+- Implement `find_process` for compare and find process matching condition 
