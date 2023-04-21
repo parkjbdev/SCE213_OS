@@ -51,13 +51,13 @@ extern bool quiet;
 #define LARGEST 1
 #define EQUAL 0
 
-struct process* find_process(int condition, int (*comparator)(struct process*))
+struct process* find_process(struct list_head* head, int condition, int (*comparator)(struct process*))
 {
 	struct process* result = NULL;
-	if (!list_empty(&readyqueue)) {
-		result = list_first_entry(&readyqueue, struct process, list);
+	if (!list_empty(head)) {
+		result = list_first_entry(head, struct process, list);
 		struct process* pos = NULL;
-		list_for_each_entry(pos, &readyqueue, list)
+		list_for_each_entry(pos, head, list)
 		{
 			if (condition < 0) {
 				if (comparator(pos) < comparator(result))
@@ -253,7 +253,7 @@ static struct process* sjf_schedule(void)
 	if (current && ticks_left(current) > 0)
 		return current;
 	else {
-		struct process* sj = find_process(SMALLEST, lifespan);
+		struct process* sj = find_process(&readyqueue, SMALLEST, lifespan);
 		if (sj == NULL)
 			return NULL;
 		list_del_init(&sj->list);
@@ -281,7 +281,7 @@ static struct process* stcf_schedule(void)
 	}
 
 	// Find STC Process
-	struct process* stc = find_process(SMALLEST, ticks_left);
+	struct process* stc = find_process(&readyqueue, SMALLEST, ticks_left);
 
 	if (!current || current->status == PROCESS_BLOCKED) {
 		list_del_init(&stc->list);
@@ -358,59 +358,38 @@ static bool prio_acquire(int resource_id)
 		return true;
 	}
 
-	assert(list_empty(&r->owner->list));
+	//	Should Not Assert Here
+	//	r->owner process could be attached to readyqueue
+	//	when it's priority is lower which results preemption
+	//	assert(list_empty(&r->owner->list));
+	//	If list_empty(&r->owner->list) is false, it means that the owner process is in readyqueue
 
-	// Find Highest Priority Process
-	struct process* highest_prio = find_process(LARGEST, prio);
-	if (highest_prio == NULL || highest_prio->prio < r->owner->prio)
-		highest_prio = r->owner;
-
-	if (current->prio > highest_prio->prio) {
-		if (highest_prio == r->owner) {
-			r->owner->status = PROCESS_BLOCKED;
-			list_add_tail_safe(&r->owner->list, &r->waitqueue);
-		}
-		// Just for safety
-		assert(list_empty(&current->list));
-		r->owner = current;
-		return true;
-	} else {
-		current->status = PROCESS_BLOCKED;
-		list_add_tail_safe(&current->list, &r->waitqueue);
-		// Just for safety
-		assert(list_empty(&highest_prio->list));
-		r->owner = highest_prio;
-
-		return false;
-	}
+	current->status = PROCESS_BLOCKED;
+	list_add_tail_safe(&current->list, &r->waitqueue);
+	return false;
 }
 
 static void prio_release(int resource_id)
 {
 	struct resource* r = resources + resource_id;
-	// Could be NULL if the process is preempted before, therefore r->owner could already be NULL
-	//	assert(r->owner == current);
+	assert(r->owner == current);
 	r->owner = NULL;
 
 	if (list_empty(&r->waitqueue))
 		return;
 
 	/* Find the highest priority process in the wait queue */
-	struct process* waiter = find_process(LARGEST, prio);
+	struct process* waiter = find_process(&r->waitqueue, LARGEST, prio);
 
 	assert(waiter->status == PROCESS_BLOCKED);
 
 	list_del_init(&waiter->list);
 	waiter->status = PROCESS_READY;
-	list_add_safe(&waiter->list, &readyqueue);
+	list_add_tail_safe(&waiter->list, &readyqueue);
 }
 
 static struct process* prio_schedule(void)
 {
-	/**
-	 * Implement your own schedule function to make the priority scheduler
-	 * correct.
-	 */
 	// List is Empty
 	if (list_empty(&readyqueue)) {
 		assert(list_empty(&current->list));
@@ -419,7 +398,11 @@ static struct process* prio_schedule(void)
 
 	// List is not empty
 	// Find the highest priority process
-	struct process* highest_prio = find_process(LARGEST, prio);
+	struct process* highest_prio = find_process(&readyqueue, LARGEST, prio);
+	// highest_prio is not null
+	assert(highest_prio != NULL);
+	// status in readyqueue must be PROCESS_READY
+	assert(highest_prio->status == PROCESS_READY);
 
 	if (!current || current->status == PROCESS_BLOCKED) {
 		list_del_init(&highest_prio->list);
@@ -431,15 +414,8 @@ static struct process* prio_schedule(void)
 	// Compare the priority
 	if (highest_prio->prio >= current->prio) {
 		// Preempt
-		// Force Release Resource if current is preempted
-		for (int i = 0; i < NR_RESOURCES; i++) {
-			struct resource* r = resources + i;
-			if (r->owner == current)
-				r->owner = NULL;
-		}
-		// Bug Fix
-		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue even though process is
-		// completed
+		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue
+		// even though process is completed which results assertion on exit
 		if (ticks_left(current) > 0)
 			list_add_tail_safe(&current->list, &readyqueue);
 		list_del_init(&highest_prio->list);
@@ -480,27 +456,23 @@ static void prio_aging_except(struct process* except)
 
 static struct process* pa_schedule(void)
 {
-	/**
-	 * Implement your own schedule function to make the priority scheduler
-	 * correct.
-	 */
+	prio_aging_except(current);
 	// List is Empty
 	if (list_empty(&readyqueue)) {
 		assert(list_empty(&current->list));
-		if (ticks_left(current) > 0) {
-			prio_aging_except(current);
-			return current;
-		} else
-			return NULL;
+		return ticks_left(current) > 0 ? current : NULL;
 	}
 
 	// List is not empty
 	// Find the highest priority process
-	struct process* highest_prio = find_process(LARGEST, prio);
+	struct process* highest_prio = find_process(&readyqueue, LARGEST, prio);
+	// highest_prio is not null
+	assert(highest_prio != NULL);
+	// status in readyqueue must be PROCESS_READY
+	assert(highest_prio->status == PROCESS_READY);
 
 	if (!current || current->status == PROCESS_BLOCKED) {
 		list_del_init(&highest_prio->list);
-		prio_aging_except(current);
 		return highest_prio;
 	}
 
@@ -509,27 +481,17 @@ static struct process* pa_schedule(void)
 	// Compare the priority
 	if (highest_prio->prio >= current->prio) {
 		// Preempt
-		// Force Release Resource if current is preempted
-		for (int i = 0; i < NR_RESOURCES; i++) {
-			struct resource* r = resources + i;
-			if (r->owner == current)
-				r->owner = NULL;
-		}
-		// Bug Fix
-		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue even though process is
-		// completed
+		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue
+		// even though process is completed which results assertion on exit
 		if (ticks_left(current) > 0)
 			list_add_tail_safe(&current->list, &readyqueue);
 		list_del_init(&highest_prio->list);
-		prio_aging_except(current);
 		return highest_prio;
 	} else {
-		if (ticks_left(current) > 0) {
-			prio_aging_except(current);
+		if (ticks_left(current) > 0)
 			return current;
-		} else {
+		else {
 			list_del_init(&highest_prio->list);
-			prio_aging_except(current);
 			return highest_prio;
 		}
 	}
