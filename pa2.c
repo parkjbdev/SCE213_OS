@@ -473,32 +473,70 @@ struct scheduler pa_scheduler = {
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
 
-static struct process* pcp_schedule(void)
+static bool pcp_acquire(int resource_id)
 {
-	assert(ticks < 1000);
-	return NULL;
+	struct resource* r = resources + resource_id;
+
+	if (!r->owner) {
+		r->owner = current;
+		r->owner->prio = MAX_PRIO;
+		return true;
+	}
+	r->owner->prio = MAX_PRIO;
+
+	current->status = PROCESS_BLOCKED;
+	list_add_tail_safe(&current->list, &r->waitqueue);
+	return false;
+}
+
+static void pcp_release(int resource_id)
+{
+	struct resource* r = resources + resource_id;
+	r->owner->prio = r->owner->prio_orig;
+
+	prio_release(resource_id);
 }
 
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
-	.acquire = prio_acquire,
-	.release = prio_release,
-	.schedule = pcp_schedule,
+	.acquire = pcp_acquire,
+	.release = pcp_release,
+	.schedule = prio_schedule,
 };
 
 /***********************************************************************
  * Priority scheduler with priority inheritance protocol
  ***********************************************************************/
 
-static struct process* pip_schedule(void)
+static bool pip_acquire(int resource_id)
 {
-	assert(ticks < 1000);
-	return NULL;
+	struct resource* r = resources + resource_id;
+
+	if (!r->owner) {
+		r->owner = current;
+		return true;
+	}
+
+	if (r->owner->prio < current->prio) {
+		r->owner->prio = current->prio;
+	}
+
+	current->status = PROCESS_BLOCKED;
+	list_add_tail_safe(&current->list, &r->waitqueue);
+	return false;
+}
+
+static void pip_release(int resource_id)
+{
+	struct resource* r = resources + resource_id;
+	r->owner->prio = r->owner->prio_orig;
+
+	prio_release(resource_id);
 }
 
 struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
-	.acquire = prio_acquire,
-	.release = prio_release,
-	.schedule = pip_schedule,
+	.acquire = pip_acquire,
+	.release = pip_release,
+	.schedule = prio_schedule,
 };
