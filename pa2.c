@@ -8,7 +8,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTIABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  **********************************************************************/
@@ -77,10 +77,10 @@ struct process* find_process(struct list_head* head, int condition, int (*compar
 int ticks_left(struct process* p) { return p->lifespan - p->age; }
 
 /***********************************************************************
- * Default FCFS resource acquision function
+ * Default FCFS resource acquisition function
  *
  * DESCRIPTION
- *   This is the default resource acquision function which is called back
+ *   This is the default resource acquisition function which is called back
  *   whenever the current process is to acquire resource @resource_id.
  *   The current implementation serves the resource in the requesting order
  *   without considering the priority. See the comments in sched.h

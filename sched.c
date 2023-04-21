@@ -8,7 +8,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTIABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  **********************************************************************/
@@ -270,7 +270,7 @@ static void __exit_process(struct process *p)
 }
 
 /**
- * Process resource acqutision
+ * Process resource acquisition
  */
 static bool __run_current_acquire()
 {
@@ -368,7 +368,7 @@ static void __do_simulation(void)
 
 			/* Try acquiring scheduled resources */
 			if (__run_current_acquire()) {
-				/* Succesfully acquired all the resources to make a progress */
+				/* Successfully acquired all the resources to make a progress */
 				__print_event(current->pid, "%d", current->pid);
 
 				/* So, it ages by one tick */
@@ -387,7 +387,8 @@ static void __do_simulation(void)
 
 		/* Increase the tick counter */
 		ticks++;
-		fprintf(stderr, "-----------------------------------------------\n");
+		if (!quiet)
+			fprintf(stderr, "-----------------------------------------------\n");
 	}
 }
 
