@@ -446,55 +446,20 @@ static void prio_aging_except(struct process* except)
 	struct process* p = NULL;
 	list_for_each_entry(p, &readyqueue, list)
 	{
-		if (p != except) {
+		if (p != except)
 			p->prio++;
-			if (!quiet)
-				fprintf(stderr, "Aging priority %d from %d to %d\n", p->pid, p->prio_orig, p->prio);
-		}
 	}
 }
 
 static struct process* pa_schedule(void)
 {
-	prio_aging_except(current);
-	// List is Empty
-	if (list_empty(&readyqueue)) {
-		assert(list_empty(&current->list));
-		return ticks_left(current) > 0 ? current : NULL;
+	struct process* next = prio_schedule();
+	if (next != NULL) {
+		prio_aging_except(next);
+		next->prio = next->prio_orig;
 	}
 
-	// List is not empty
-	// Find the highest priority process
-	struct process* highest_prio = find_process(&readyqueue, LARGEST, prio);
-	// highest_prio is not null
-	assert(highest_prio != NULL);
-	// status in readyqueue must be PROCESS_READY
-	assert(highest_prio->status == PROCESS_READY);
-
-	if (!current || current->status == PROCESS_BLOCKED) {
-		list_del_init(&highest_prio->list);
-		return highest_prio;
-	}
-
-	assert(list_empty(&current->list));
-
-	// Compare the priority
-	if (highest_prio->prio >= current->prio) {
-		// Preempt
-		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue
-		// even though process is completed which results assertion on exit
-		if (ticks_left(current) > 0)
-			list_add_tail_safe(&current->list, &readyqueue);
-		list_del_init(&highest_prio->list);
-		return highest_prio;
-	} else {
-		if (ticks_left(current) > 0)
-			return current;
-		else {
-			list_del_init(&highest_prio->list);
-			return highest_prio;
-		}
-	}
+	return next;
 }
 
 struct scheduler pa_scheduler = {
