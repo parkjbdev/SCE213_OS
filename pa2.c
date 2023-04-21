@@ -74,28 +74,6 @@ struct process* find_process(struct list_head* head, int condition, int (*compar
 	return result;
 }
 
-struct process* rqueue(int idx)
-{
-	struct list_head* pos = (&readyqueue)->next;
-
-	for (int i = 0; i < idx; i++) {
-		pos = pos->next;
-	}
-	return (struct process*)((char*)pos - offsetof(struct process, list));
-}
-
-void list_add_safe(struct list_head* new, struct list_head* head)
-{
-	assert(list_empty(new));
-	list_add(new, head);
-}
-
-void list_add_tail_safe(struct list_head* new, struct list_head* head)
-{
-	assert(list_empty(new));
-	list_add_tail(new, head);
-}
-
 int ticks_left(struct process* p) { return p->lifespan - p->age; }
 
 /***********************************************************************
@@ -185,10 +163,6 @@ static void fcfs_release(int resource_id)
 /***********************************************************************
  * FIFO scheduler
  ***********************************************************************/
-static int fifo_initialize(void) { return 0; }
-
-static void fifo_finalize(void) { }
-
 static struct process* fifo_schedule(void)
 {
 	struct process* next = NULL;
@@ -238,8 +212,6 @@ struct scheduler fifo_scheduler = {
 	.name = "FIFO",
 	.acquire = fcfs_acquire,
 	.release = fcfs_release,
-	.initialize = fifo_initialize,
-	.finalize = fifo_finalize,
 	.schedule = fifo_schedule,
 };
 
@@ -263,11 +235,9 @@ static struct process* sjf_schedule(void)
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
-	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
-	.release = fcfs_release, /* Use the default FCFS release() */
-	.schedule = sjf_schedule, /* TODO: Assign your schedule function
-							   to this function pointer to activate
-							   SJF in the simulation system */
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
+	.schedule = sjf_schedule,
 };
 
 /***********************************************************************
@@ -304,15 +274,9 @@ static struct process* stcf_schedule(void)
 
 struct scheduler stcf_scheduler = {
 	.name = "Shortest Time-to-Complete First",
-	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
-	.release = fcfs_release, /* Use the default FCFS release() */
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
 	.schedule = stcf_schedule,
-
-	/* You need to check the newly created processes to implement STCF.
-	 * Have a look at @forked() callback.
-	 */
-
-	/* Obviously, you should implement stcf_schedule() and attach it here */
 };
 
 /***********************************************************************
@@ -335,11 +299,9 @@ static struct process* rr_schedule(void)
 
 struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
-	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
-	.release = fcfs_release, /* Use the default FCFS release() */
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
 	.schedule = rr_schedule,
-
-	/* Obviously, ... */
 };
 
 /***********************************************************************
@@ -347,27 +309,6 @@ struct scheduler rr_scheduler = {
  ***********************************************************************/
 
 int prio(struct process* p) { return p->prio; }
-
-static bool prio_acquire(int resource_id)
-{
-	struct resource* r = resources + resource_id;
-
-	/* If the resource is not owned by anyone, just acquire it */
-	if (!r->owner) {
-		r->owner = current;
-		return true;
-	}
-
-	//	Should Not Assert Here
-	//	r->owner process could be attached to readyqueue
-	//	when it's priority is lower which results preemption
-	//	assert(list_empty(&r->owner->list));
-	//	If list_empty(&r->owner->list) is false, it means that the owner process is in readyqueue
-
-	current->status = PROCESS_BLOCKED;
-	list_add_tail_safe(&current->list, &r->waitqueue);
-	return false;
-}
 
 static void prio_release(int resource_id)
 {
@@ -385,7 +326,7 @@ static void prio_release(int resource_id)
 
 	list_del_init(&waiter->list);
 	waiter->status = PROCESS_READY;
-	list_add_tail_safe(&waiter->list, &readyqueue);
+	list_add_tail(&waiter->list, &readyqueue);
 }
 
 static struct process* prio_schedule(void)
@@ -417,7 +358,7 @@ static struct process* prio_schedule(void)
 		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue
 		// even though process is completed which results assertion on exit
 		if (ticks_left(current) > 0)
-			list_add_tail_safe(&current->list, &readyqueue);
+			list_add_tail(&current->list, &readyqueue);
 		list_del_init(&highest_prio->list);
 		return highest_prio;
 	} else {
@@ -432,7 +373,7 @@ static struct process* prio_schedule(void)
 
 struct scheduler prio_scheduler = {
 	.name = "Priority",
-	.acquire = prio_acquire,
+	.acquire = fcfs_acquire,
 	.release = prio_release,
 	.schedule = prio_schedule,
 };
@@ -464,10 +405,19 @@ static struct process* pa_schedule(void)
 
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
-	.acquire = prio_acquire,
+	.acquire = fcfs_acquire,
 	.release = prio_release,
 	.schedule = pa_schedule,
 };
+
+static void prio_init_release(int resource_id)
+{
+	struct resource* r = resources + resource_id;
+
+	r->owner->prio = r->owner->prio_orig;
+
+	prio_release(resource_id);
+}
 
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
@@ -477,30 +427,18 @@ static bool pcp_acquire(int resource_id)
 {
 	struct resource* r = resources + resource_id;
 
-	if (!r->owner) {
-		r->owner = current;
+	if (!r->owner)
+		current->prio = MAX_PRIO;
+	else
 		r->owner->prio = MAX_PRIO;
-		return true;
-	}
-	r->owner->prio = MAX_PRIO;
 
-	current->status = PROCESS_BLOCKED;
-	list_add_tail_safe(&current->list, &r->waitqueue);
-	return false;
-}
-
-static void pcp_release(int resource_id)
-{
-	struct resource* r = resources + resource_id;
-	r->owner->prio = r->owner->prio_orig;
-
-	prio_release(resource_id);
+	return fcfs_acquire(resource_id);
 }
 
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
 	.acquire = pcp_acquire,
-	.release = pcp_release,
+	.release = prio_init_release,
 	.schedule = prio_schedule,
 };
 
@@ -512,31 +450,16 @@ static bool pip_acquire(int resource_id)
 {
 	struct resource* r = resources + resource_id;
 
-	if (!r->owner) {
-		r->owner = current;
-		return true;
-	}
-
-	if (r->owner->prio < current->prio) {
+	if (r->owner && r->owner->prio < current->prio) {
 		r->owner->prio = current->prio;
 	}
 
-	current->status = PROCESS_BLOCKED;
-	list_add_tail_safe(&current->list, &r->waitqueue);
-	return false;
-}
-
-static void pip_release(int resource_id)
-{
-	struct resource* r = resources + resource_id;
-	r->owner->prio = r->owner->prio_orig;
-
-	prio_release(resource_id);
+	return fcfs_acquire(resource_id);
 }
 
 struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
 	.acquire = pip_acquire,
-	.release = pip_release,
+	.release = prio_init_release,
 	.schedule = prio_schedule,
 };
