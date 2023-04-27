@@ -291,14 +291,14 @@ static struct process* rr_schedule(void)
 		list_add_tail(&current->list, &readyqueue);
 	}
 
-	pick_rr_next:
+pick_rr_next:
 	if (!list_empty(&readyqueue)) {
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_del_init(&next->list);
 	}
 
 	return next;
-	}
+}
 
 struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
@@ -334,44 +334,22 @@ static void prio_release(int resource_id)
 
 static struct process* prio_schedule(void)
 {
-	// List is Empty
-	if (list_empty(&readyqueue)) {
-		assert(list_empty(&current->list));
-		return ticks_left(current) > 0 ? current : NULL;
-	}
-
-	// List is not empty
-	// Find the highest priority process
-	struct process* highest_prio = find_process(&readyqueue, LARGEST, prio);
-	// highest_prio is not null
-	assert(highest_prio != NULL);
-	// status in readyqueue must be PROCESS_READY
-	assert(highest_prio->status == PROCESS_READY);
+	struct process* highest_prio = NULL;
 
 	if (!current || current->status == PROCESS_BLOCKED) {
-		list_del_init(&highest_prio->list);
-		return highest_prio;
+		goto pick_prio_next;
 	}
 
-	assert(list_empty(&current->list));
+	if (ticks_left(current) > 0)
+		list_add_tail(&current->list, &readyqueue);
 
-	// Compare the priority
-	if (highest_prio->prio >= current->prio) {
-		// Preempt
-		// If ticks_left(current) > 0 is not checked, process will be added to readyqueue
-		// even though process is completed which results assertion on exit
-		if (ticks_left(current) > 0)
-			list_add_tail(&current->list, &readyqueue);
+pick_prio_next:
+	if (!list_empty(&readyqueue)) {
+		highest_prio = find_process(&readyqueue, LARGEST, prio);
 		list_del_init(&highest_prio->list);
-		return highest_prio;
-	} else {
-		if (ticks_left(current) > 0)
-			return current;
-		else {
-			list_del_init(&highest_prio->list);
-			return highest_prio;
-		}
 	}
+
+	return highest_prio;
 }
 
 struct scheduler prio_scheduler = {
