@@ -282,18 +282,23 @@ struct scheduler stcf_scheduler = {
  ***********************************************************************/
 static struct process* rr_schedule(void)
 {
-	struct process* next = list_first_entry_or_null(&readyqueue, struct process, list);
-	bool current_uncompleted = current && current->status != PROCESS_BLOCKED && ticks_left(current) > 0;
+	struct process* next = NULL;
+	if (!current || current->status == PROCESS_BLOCKED) {
+		goto pick_rr_next;
+	}
 
-	if (next == NULL)
-		return current_uncompleted ? current : NULL;
-
-	if (current_uncompleted)
+	if (ticks_left(current) > 0) {
 		list_add_tail(&current->list, &readyqueue);
+	}
 
-	list_del_init(&next->list);
+	pick_rr_next:
+	if (!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_del_init(&next->list);
+	}
+
 	return next;
-}
+	}
 
 struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
