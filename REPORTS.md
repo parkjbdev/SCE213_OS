@@ -30,10 +30,12 @@ STCF Scheduler 역시 SJF Scheduler 와 마찬가지로, `readyqueue` 에 등록
 따라서 SJF Scheduler 와 마찬가지로, 비교적 `lifespan` 이 짧은 process 가 계속하여 fork 된다면 작업을 끝내기까지 오랜시간이 걸리는 process 들은 계속 순위가 밀려 starvation 이 발생할 수 있다.
 Preemptive 한 scheduler 이기 때문에 앞선 두 scheduler 들과 달리, `current` process 가 실행중일 때에도 가장 먼저 끝날 수 있는 process 가 업데이트되어 달라지면, 해당 process 가 더 우선적으로 scheduling 될 수 있도록 하였다.
 
-한가지 의문에 남았던 것은, 기존에 주어진 STCF Scheduler 의 주석에 forked 가 필요할 것이라고 하였지만, 본인은 forked 함수의 구현 없이 scheduler 를 완성하였다는 점이다.
-현재 구현에서는 매 스케줄링마다 조건에 맞는 process 를 `readyqueue` 에서 순회하며 찾아서 scheduling 하였지만, forked 함수가 이용되는 로직이라면, 정렬된 `readyqueue` 를 이용하는 방식일 것으로 생각한다.
+한가지 의문에 남았던 것은, 기존에 주어진 STCF Scheduler 의 주석에 forked 가 필요할 것이라고 주석을 통해 확인하였지만, 본인은 forked 함수의 구현 없이 scheduler 를 완성하였다는 점이다.
+~~현재 구현에서는 매 스케줄링마다 조건에 맞는 process 를 `readyqueue` 에서 순회하며 찾아서 scheduling 하였지만, forked 함수가 이용되는 로직이라면, 정렬된 `readyqueue` 를 이용하는 방식일 것으로 생각한다.
 프로세스가 생성될때마다 정렬된 `readyqueue` 에서 올바른 위치에 fork 된 프로세스를 옮겨주면, schedule 함수에서 `readyqueue` 를 순회하며 조건에 맞는 process 를 찾는 과정 없이 first_entry 를 뽑아 `current` process 와의 우선순위를 비교하여 scheduling 할 수 있기 때문이다.
-다만, 이렇게 `readyqueue` 를 관리한다면, SJF Scheduler 에 대해서도 마찬가지로 forked 함수가 필요할 것이다.
+다만, 이렇게 `readyqueue` 를 관리한다면, SJF Scheduler 에 대해서도 마찬가지로 forked 함수가 필요할 것이다.~~
+이와 같은 이유로 forked 함수를 사용할 것을 권장하였다고 생각하였지만, 계속된 refactoring 을 진행하면서 어느정도 일정한 패턴이 있음을 확인하였고, 이러한 패턴을 지키기 위해서는 forked 함수가 필요한 것으로 생각된다.
+하지만, 위의 언급한 아이디어를 이용한다면, 매 스케줄링마다 순회하는 횟수를 조금이나마 줄여 오버헤드를 줄일 수 있을 것으로 생각한다.
 
 ## RR Scheduler
 
@@ -42,4 +44,61 @@ RR Scheduler는 round-robin scheduler 의 약자로, 각 프로세스에게 동�
 
 이러한 특징을 가진 RR Scheduler의 구현은 STCF보다도 쉽게 구현할 수 있었다.
 preemptive한 fifo scheduler라고 생각할 수 있기 때문에, 큰 틀은 이와 유사하게 구현할 수 있었으며, 대신 1 tick 씩만 실행되고 `readyqueue`의 tail에 다시 저장할 수 있도록 구현하였다.
+초기에 RR Scheduler 를 구현할 때에는 이러한 FIFO Schedule 와의 공통적인 특징을 미처 생각하지 못하고, 논리흐름은 유사하지만 다른 코드로 구현하였다. 하지만, 이러한 공통적인 특징을 파악하고, 논리흐름을 더 직관적으로 이해할 수 있는 FIFO Scheduler 의 코드를 일부 재사용하여 재구현하였고, 출력결과는 모든 테스트케이스에 대해서 같음을 확인하였다. (955d15b1)
 
+## Priority Scheduler
+
+Priority Scheduler는 각 process의 priority 에 따라 scheduling 하는 순서가 결정되는 방식의 scheduler 이다.
+이번 프로젝트에서는 `prio` 멤버 변수의 크기가 클수록 더 높은 priority 를 가진 process 로 규정하였으며, `readyqueue` 에 대기하는 process 들 중에서 가장 높은 priority 를 가진 process 를 매 스케줄링마다 뽑아서 반환해주도록 하였다.
+즉, preemptive 한 형태의 priority scheduler 이다.
+또, 같은 priority 를 가진 process 들에 대해서는 rr scheduling 을 해주는 것이 목표이다.
+
+이번 priority scheduler의 구현에서 혼동되는 개념들과 잘못된 구현으로 인한 메모리 에러 및 assertion failure 때문에 초반에 난항을 많이 겪었다.
+특히 resource 를 acquire 하고 release 하는 과정에서 혼동이 많았는데, 처음 구현할 당시에 가장 크게 헷갈렸던 부분은 resource 를 acquire 하고 release 하는 과정에서 어느시점에 release 를 진행해야 하는지였다.
+
+우선 처음 잘못 이해한 priority scheduler 에서는, 만약 리소스가 이미 다른 더 우선순위가 낮은 프로세스에 의해 사용중인 상태일 때에는, 강제로 해당 리소스를 release 시키고서라도 priority 가 더 높은 프로세스에게 우선적으로 scheduling을 진행해 줄 수 있도록 해야한다고 생각하였다.
+하지만 이는 priority inversion에 대한 내용을 정확하게 숙지하지 못한 결과이다.
+만약, 우선순위가 더 높은 프로세스가 언제든 강제로 우선순위가 더 낮은 프로세스의 resource 를 뺏어와 우선순위가 더 높은 프로세스로 preempt 할 수 있었다면, priority inversion 과 같은 문제는 일어나지 않았을 것이다.
+하지만, 리소스의 특성상, 이미 사용중인 리소스에는 다른 프로세스가 접근하여 동시에 사용할 수 없기 때문에 강제로 리소스 사용을 해제하게 된다면, 이전에 리소스를 사용하여 진행하였던 tick들을 다시 진행해야 하는 상황이 발생한다.
+또, 더 높은 우선순위를 가진 process A가 resource 를 acquire 하였을 때, 낮은 우선순위를 가진 process B 에 의해 block 당했다면, block 시킨 process B 를 실행시켜야 더 높은 우선순위를 가진 프로세스A 가 우선적으로 실행될 수 있다고 생각하여, process B 로 스케줄링을 진행하려 하였다.
+하지만, 이런 스케줄러가 존재한다면, priority inversion 이 존재하지 않는 스케줄러가 되었을 것이다. 이 역시 priority inversion 에 대해서 잘못 이해하여 생긴 결과였다.
+
+두번째로 또 잘못 구현하였던 것은 `readyqueue`에서 `PROCESS_READY` state 에 있는 프로세스와 `r->waitqueue` 에서 `PROCESS_BLOCKED` state 에 있는 프로세스들을 혼용한 점이다.
+resource 를 요청하였지만 블락당한 프로세스들은 `r->waitqueue` 에 등록을 해주어 해당 리소스가 release 될 때에 다시 `readyqueue` 에 추가되어 scheduler 에서 자연스럽게 scheduling 될 수 있도록 해주어야 하는데, priority inversion에 대한 미숙한 이해와 이미 구현된 framework 의 이해 부족으로 scheduler 에서 직접 리소스들에 접근하려는 방법역시 시도하였지만, 사용이 제한된 함수여서 그렇게 하지 못하였다.
+
+그렇게 resource의 release 와 acquire 등에 대한 고민들에 대해서 다시 공부하고 QnA 등을 통해 해결하여 성공적으로 testcase를 통과할 수 있었다.
+막상 구현을 완성하고 모든 testcase를 통과하였더니 생각했던 것보다는 단순한 코드를 확인할 수 있었다. 이때의 논리흐름을 가독성있게 다시 정리하여 표현하여 보았더니 (1e77af93), `rr_schedule` 과 한라인을 제외하고 사실상 동일한 코드가 나옴을 확인할 수 있었다.
+`rr_schedule` 에서는 priority 에 대한 고려없이 스케줄링을 해주어 단순히 `readyqueue` 의 첫번째 엔트리를 스케줄링 하였지만, `prio_schedule` 에서는 priority 가 가장 높은 프로세스를 직접 구현한 `find_process` 함수를 통해 찾아 스케줄링 해주는 부분이 유일하게 다른 점이였다.
+
+위의 이해한 내용들을 바탕으로 resource를 acquire 하는 함수 `prio_acquire` 를 구현해 본 결과, 사실상 `fcfs_acquire` 와 같은 코드를 쓰고 있는 것을 발견하게 되었다.
+acquire 의 경우 resource 의 waitqueue에 등록될때 우선순위가 바뀌는 과정이 존재하지 않는다면, (ex. PIP/PCP Schedulin, aging의 경우 스케줄링 되면 `prio`가 초기상태로 돌아가므로 제외..) 그 과정은
+>
+> 1. 리소스 점유중이지 않으면 할당
+>
+> 2. 리소스가 점유되고 있는 중이면 해당 리소스의 `waitqueue`에 등록
+
+과 같은 과정으로 동일하게 나타난다.
+
+resource를 release 하는 함수 `prio_release` 역시 `fcfs_release` 와 거의 유사한 형태로, `fcfs_release` 는 단순히 `waitqueue` 에서 가장 첫번째 엔트리를 `readyqueue` 에 등록해준 반면, `prio_release` 는 `waitqueue` 에서 가장 우선순위가 높은 process를 `readyqueue` 에 등록해준다는 점에서만 차이가 존재하였다.
+
+이러한 시행착오들을 거쳐 구현을 완성하여 모든 testcase들을 통과할 수 있었다.
+
+## Priority + Aging
+
+Priority Scheduling with Aging Scheduler는 말 그대로, 1 tick 이 흐를 때마다 `readyqueue` 에서 대기중인 프로세스들의 `prio` 를 1씩 높여주고, 스케줄링된 process의 경우 원래의 `prio`로 다시 초기화하는 방식을 채택한 priority scheduler 이다.
+이러한 방법을 이용하면, 기존의 priority scheduler에 비해서 starvation 을 예방할 수 있다는 장점이 존재한다.
+기본적인 틀은 기존의 priority scheduler와 동일하며, `pa_schedule` 에서도 `prio_schedule` 을 이용하여 다음에 실행될 프로세스를 scheduling 한다.
+다만, 스케줄링 받지 못한 프로세스들은 모두 `prio` 를 aging 시킨다는 점이 유일한 차이이다.
+기존의 priority scheduler를 이용한 scheduler 인지라, 구현은 간단하였다.
+구현 초반에 prio가 모두 1씩 높아지면, 당연히 서로의 우선순위간의 차이가 발생하지 않을 것이라 생각하고, 새로운 process가 fork 되는것이 아닌이상, aging이 무슨 의미가 있는것인지 생각하였는데, current를 제외하여 aging되며, scheduling 받는순간 원래의 priority로 돌아간다는 사실을 간과하고 있어서 발생한 문제였다.
+이를 인지하고, testcase들을 직접 계산해보았더니 이러한 priority aging scheduling을 이용하면, 아무리 priority가 제일 낮은 프로세스더라도, 계속하여 그 priority가 높아져 1tick 이라도 실행하여 starvation을 방지하는 것을 확인할 수 있었다.
+
+## Priority + Ceiling Protocol
+<!-- TODO -->
+## Priority + Inheritance Protocol
+<!-- TODO -->
+## Lessons Learned
+
+- Resource Acquistion 과 priority inversion 에 대한 이해가 부족하였지만, 이번 프로젝트를 통해 언제 resource 를 acquire 하고, release 할 때의 동작, block 당했을 때의 후속 동작 등을 직접 구현하면서 priority inversion 을 완벽하게 이해할 수 있었다.
+- priority aging을 구현하면서 각 프로세스들의 priority 가 점점 높아져 1tick이라도 scheduling 되는 모습을 확인하였다. 이를 통해 starvation을 방지하는 과정을 확인하였다.
+- 프로그램을 작성할 때에, `goto` 문의 사용을 지양하고 기피하였는데, 이번 프로젝트에서는 이를 사용하지 않았을 때 오히려 가독성이 떨어지고 logic 의 흐름을 알아차기가 어려운 면이 존재하였다. 따라서 `goto` 문의 무조건적인 기피보다 필요에 따라 적절히 활용하여 더 효율적으로 작성이 가능하다면 이를 채택하고 사용하여도 되겠다는 생각이 들었다.
