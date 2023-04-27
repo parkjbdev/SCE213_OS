@@ -366,7 +366,7 @@ static void prio_aging_except(struct process* except)
 	struct process* p = NULL;
 	list_for_each_entry(p, &readyqueue, list)
 	{
-		if (p != except)
+		if (p != except && p->prio < MAX_PRIO)
 			p->prio++;
 	}
 }
