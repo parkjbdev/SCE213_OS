@@ -85,7 +85,7 @@ resource를 release 하는 함수 `prio_release` 역시 `fcfs_release` 와 거�
 
 ## Priority + Aging
 
-Priority Scheduling with Aging Scheduler는 말 그대로, 1 tick 이 흐를 때마다 `readyqueue` 에서 대기중인 프로세스들의 `prio` 를 1씩 높여주고, 스케줄링된 process의 경우 원래의 `prio`로 다시 초기화하는 방식을 채택한 priority scheduler 이다.
+Priority Scheduling with Aging은 말 그대로, 1 tick 이 흐를 때마다 `readyqueue` 에서 대기중인 프로세스들의 `prio` 를 1씩 높여주고, 스케줄링된 process의 경우 원래의 `prio`로 다시 초기화하는 방식을 채택한 priority scheduler 이다.
 이러한 방법을 이용하면, 기존의 priority scheduler에 비해서 starvation 을 예방할 수 있다는 장점이 존재한다.
 기본적인 틀은 기존의 priority scheduler와 동일하며, `pa_schedule` 에서도 `prio_schedule` 을 이용하여 다음에 실행될 프로세스를 scheduling 한다.
 다만, 스케줄링 받지 못한 프로세스들은 모두 `prio` 를 aging 시킨다는 점이 유일한 차이이다.
@@ -94,9 +94,16 @@ Priority Scheduling with Aging Scheduler는 말 그대로, 1 tick 이 흐를 때
 이를 인지하고, testcase들을 직접 계산해보았더니 이러한 priority aging scheduling을 이용하면, 아무리 priority가 제일 낮은 프로세스더라도, 계속하여 그 priority가 높아져 1tick 이라도 실행하여 starvation을 방지하는 것을 확인할 수 있었다.
 
 ## Priority + Ceiling Protocol
-<!-- TODO -->
+
+Priority Scheduling with Ceiling Protocol은 priority inversion을 방지하기 위한 해결책 중 하나로, priority가 더 높은 process가 요청한 resource가 block 당할 경우 priority inversion이 일어나지 않도록 기존에 resource를 점유하고 있는 process의 priority를 일시적으로 최대 priority로 boosting 하는 기법이다.
+또, 기존에 점유하고 있던 resource가 없어 acquire 하였다면, 자신의 priority 역시 최대로 boosting 하여 가장 우선적으로 끝날 수 있도록 한다.
+일시적인 priority boosting 이므로, 점유하고 있던 리소스를 release 할 때에는 원래의 priority로 돌아가게 된다.
+
 ## Priority + Inheritance Protocol
-<!-- TODO -->
+
+Priority Scheduling with Inheritance Protocol 역시 Ceiling Protocol와 함께 priority inversion을 방지하기 위한 해결책으로, block 시킨 더 낮은 우선순위를 가진 프로세스를 ceiling protocol과는 달리 최대 priority로 boosting 하지 않고, resource를 요청한 더 높은 프로세스의 priority를 상속받아 boosting하는 기법이다.
+pip scheduling에서도 pcp scheduling과 마찬가지로, resource를 release 할 때에는 원래의 priority로 돌아와서 원래의 우선순위에 맞게 scheduling 될 수 있도록 한다.
+
 ## Lessons Learned
 
 - Resource Acquistion 과 priority inversion 에 대한 이해가 부족하였지만, 이번 프로젝트를 통해 언제 resource 를 acquire 하고, release 할 때의 동작, block 당했을 때의 후속 동작 등을 직접 구현하면서 priority inversion 을 완벽하게 이해할 수 있었다.
