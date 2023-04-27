@@ -325,8 +325,6 @@ static void prio_release(int resource_id)
 	/* Find the highest priority process in the wait queue */
 	struct process* waiter = find_process(&r->waitqueue, LARGEST, prio);
 
-	assert(waiter->status == PROCESS_BLOCKED);
-
 	list_del_init(&waiter->list);
 	waiter->status = PROCESS_READY;
 	list_add_tail(&waiter->list, &readyqueue);
@@ -391,15 +389,6 @@ struct scheduler pa_scheduler = {
 	.schedule = pa_schedule,
 };
 
-static void prio_init_release(int resource_id)
-{
-	struct resource* r = resources + resource_id;
-
-	r->owner->prio = r->owner->prio_orig;
-
-	prio_release(resource_id);
-}
-
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
@@ -414,6 +403,15 @@ static bool pcp_acquire(int resource_id)
 		r->owner->prio = MAX_PRIO;
 
 	return fcfs_acquire(resource_id);
+}
+
+static void prio_init_release(int resource_id)
+{
+	struct resource* r = resources + resource_id;
+
+	r->owner->prio = r->owner->prio_orig;
+
+	prio_release(resource_id);
 }
 
 struct scheduler pcp_scheduler = {
