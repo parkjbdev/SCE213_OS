@@ -224,13 +224,11 @@ static struct process* sjf_schedule(void)
 {
 	if (current && ticks_left(current) > 0)
 		return current;
-	else {
-		struct process* sj = find_process(&readyqueue, SMALLEST, lifespan);
-		if (sj == NULL)
-			return NULL;
-		list_del_init(&sj->list);
-		return sj;
-	}
+	struct process* sj = find_process(&readyqueue, SMALLEST, lifespan);
+	if (sj == NULL)
+		return NULL;
+	list_del_init(&sj->list);
+	return sj;
 }
 
 struct scheduler sjf_scheduler = {
@@ -284,7 +282,7 @@ struct scheduler stcf_scheduler = {
  ***********************************************************************/
 static struct process* rr_schedule(void)
 {
-	struct process* next = list_empty(&readyqueue) ? NULL : list_first_entry_or_null(&readyqueue, struct process, list);
+	struct process* next = list_first_entry_or_null(&readyqueue, struct process, list);
 	bool current_uncompleted = current && current->status != PROCESS_BLOCKED && ticks_left(current) > 0;
 
 	if (next == NULL)
