@@ -30,12 +30,12 @@ STCF Scheduler 역시 SJF Scheduler 와 마찬가지로, `readyqueue` 에 등록
 따라서 SJF Scheduler 와 마찬가지로, 비교적 `lifespan` 이 짧은 process 가 계속하여 fork 된다면 작업을 끝내기까지 오랜시간이 걸리는 process 들은 계속 순위가 밀려 starvation 이 발생할 수 있다.
 Preemptive 한 scheduler 이기 때문에 앞선 두 scheduler 들과 달리, `current` process 가 실행중일 때에도 가장 먼저 끝날 수 있는 process 가 업데이트되어 달라지면, 해당 process 가 더 우선적으로 scheduling 될 수 있도록 하였다.
 
+초기 구현에서는 논리의 흐름이 보기 어려웠으나, 완성하고 다시 리팩토링을 진행한 결과, 결국 scheduler의 패턴들이 모두 비슷한 구조를 가지고 있음을 확인하였고, stcf 도 논리흐름이 더 잘보이도록 readable 하게 리팩토링하였다. (1dd4d6d)
+
 한가지 의문에 남았던 것은, 기존에 주어진 STCF Scheduler 의 주석에 forked 가 필요할 것이라고 주석을 통해 확인하였지만, 본인은 forked 함수의 구현 없이 scheduler 를 완성하였다는 점이다.
-~~현재 구현에서는 매 스케줄링마다 조건에 맞는 process 를 `readyqueue` 에서 순회하며 찾아서 scheduling 하였지만, forked 함수가 이용되는 로직이라면, 정렬된 `readyqueue` 를 이용하는 방식일 것으로 생각한다.
+현재 구현에서는 매 스케줄링마다 조건에 맞는 process 를 `readyqueue` 에서 순회하며 찾아서 scheduling 하였지만, forked 함수가 이용되는 로직이라면, 정렬된 `readyqueue` 를 이용하는 방식일 것으로 생각한다.
 프로세스가 생성될때마다 정렬된 `readyqueue` 에서 올바른 위치에 fork 된 프로세스를 옮겨주면, schedule 함수에서 `readyqueue` 를 순회하며 조건에 맞는 process 를 찾는 과정 없이 first_entry 를 뽑아 `current` process 와의 우선순위를 비교하여 scheduling 할 수 있기 때문이다.
-다만, 이렇게 `readyqueue` 를 관리한다면, SJF Scheduler 에 대해서도 마찬가지로 forked 함수가 필요할 것이다.~~
-이와 같은 이유로 forked 함수를 사용할 것을 권장하였다고 생각하였지만, 계속된 refactoring 을 진행하면서 어느정도 일정한 패턴이 있음을 확인하였고, 이러한 패턴을 지키기 위해서는 forked 함수가 필요한 것으로 생각된다.
-하지만, 위의 언급한 아이디어를 이용한다면, 매 스케줄링마다 순회하는 횟수를 조금이나마 줄여 오버헤드를 줄일 수 있을 것으로 생각한다.
+다만, 이렇게 `readyqueue` 를 관리한다면, SJF Scheduler 에 대해서도 마찬가지로 forked 함수가 필요할 것이다.
 
 ## RR Scheduler
 
@@ -132,4 +132,6 @@ priority scheduling에 기반한 스케줄러에 resource 를 acquire 할 때, `
 - priority aging을 구현하면서 각 프로세스들의 priority 가 점점 높아져 1tick이라도 scheduling 되는 모습을 확인하였다. 이를 통해 starvation을 방지하는 과정을 확인하였다.
 - 올바르게 다시 이해한 priority inversion 내용에 바탕하여, 이러한 문제를 방지하기 위한 priority boosting 을 위한 ceiling protocol, inheritance protocol을 구현해보았다. `testcases/resources-adv2` 를 이용하여 기본 priority scheduling과 priority inheritance protocol 이 적용된 priority scheduling 의 실행결과를 비교해 보았다. ([diffcheck 결과](https://www.diffchecker.com/iEaVYwTw/))
 그 결과, priority scheduling 의 3tick 에서 priority inversion이 발생하는 것을 확인할 수 있었고, inheritance protocol 을 적용하였을 때에는 priority 가 더 높은 process 4의 실행을 위해 process 1에게 priority를 상속해주었더니, priority inversion이 발생하지 않는 것을 확인할 수 있었다.
-- 프로그램을 작성할 때에, `goto` 문의 사용을 지양하고 기피하였는데, 이번 프로젝트에서는 이를 사용하지 않았을 때 오히려 가독성이 떨어지고 logic 의 흐름을 알아차기가 어려운 면이 존재하였다. 따라서 `goto` 문의 무조건적인 기피보다 필요에 따라 적절히 활용하여 더 효율적으로 작성이 가능하다면 이를 채택하고 사용하여도 되겠다는 생각이 들었다.
+- 프로그램을 작성할 때에, `goto` 문의 사용을 지양하고 기피하였는데, 이번 프로젝트에서는 이를 사용하지 않았을 때 오히려 가독성이 떨어지고 logic 의 흐름을 알아차기가 어려운 면이 존재하였다.
+모든 스케줄러들을 완성한 이후에 기존의 주어진 `goto`문이 사용된 `fcfs_schedule` 코드의 스타일을 적용할 수 있을지 각각의 스케줄러들을 다 확인하면서 최대한 유사한 구조로 리팩토링을 한 결과, 비슷한 구조로 적용이 가능했고, 더 readable 한 코드를 얻을 수 있었다.
+따라서 `goto` 문의 무조건적인 기피보다 필요에 따라 적절히 활용하여 더 효율적으로 작성이 가능하다면 이를 채택하고 사용하여도 되겠다는 생각이 들었다.
