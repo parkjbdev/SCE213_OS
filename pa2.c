@@ -243,31 +243,22 @@ struct scheduler sjf_scheduler = {
  ***********************************************************************/
 static struct process* stcf_schedule(void)
 {
-	// if no job is ready in queue, return current process
-	if (list_empty(&readyqueue)) {
-		return ticks_left(current) > 0 ? current : NULL;
-	}
-
-	// Find STC Process
-	struct process* stc = find_process(&readyqueue, SMALLEST, ticks_left);
-
+	struct process* stc = NULL;
 	if (!current || current->status == PROCESS_BLOCKED) {
-		list_del_init(&stc->list);
-		return stc;
+		goto pick_stc_next;
 	}
 
-	if (ticks_left(stc) < ticks_left(current)) {
+	if (ticks_left(current) > 0) {
 		list_add(&current->list, &readyqueue);
-		list_del_init(&stc->list);
-		return stc;
-	} else {
-		if (ticks_left(current) > 0)
-			return current;
-		else {
-			list_del_init(&stc->list);
-			return stc;
-		}
 	}
+
+pick_stc_next:
+	if (!list_empty(&readyqueue)) {
+		stc = find_process(&readyqueue, SMALLEST, ticks_left);
+		list_del_init(&stc->list);
+	}
+
+	return stc;
 }
 
 struct scheduler stcf_scheduler = {
