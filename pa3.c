@@ -8,7 +8,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTIABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  **********************************************************************/
@@ -28,25 +28,23 @@ extern struct list_head processes;
 /**
  * Currently running process
  */
-extern struct process *current;
+extern struct process* current;
 
 /**
  * Page Table Base Register that MMU will walk through for address translation
  */
-extern struct pagetable *ptbr;
+extern struct pagetable* ptbr;
 
 /**
  * TLB of the system.
  */
 extern struct tlb_entry tlb[1UL << (PTES_PER_PAGE_SHIFT * 2)];
 
-
 /**
  * The number of mappings for each page frame. Can be used to determine how
  * many processes are using the page frames.
  */
 extern unsigned int mapcounts[];
-
 
 /**
  * lookup_tlb(@vpn, @rw, @pfn)
@@ -63,11 +61,7 @@ extern unsigned int mapcounts[];
  *   Return true if the translation is cached in the TLB.
  *   Return false otherwise
  */
-bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int *pfn)
-{
-	return false;
-}
-
+bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn) { return false; }
 
 /**
  * insert_tlb(@vpn, @rw, @pfn)
@@ -80,10 +74,7 @@ bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int *pfn)
  *   Also, in the current simulator, TLB is big enough to cache all the entries of
  *   the current page table, so don't worry about TLB entry eviction. ;-)
  */
-void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn)
-{
-}
-
+void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) { }
 
 /**
  * alloc_page(@vpn, @rw)
@@ -101,11 +92,7 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn)
  *   Return allocated page frame number.
  *   Return -1 if all page frames are allocated.
  */
-unsigned int alloc_page(unsigned int vpn, unsigned int rw)
-{
-	return -1;
-}
-
+unsigned int alloc_page(unsigned int vpn, unsigned int rw) { return -1; }
 
 /**
  * free_page(@vpn)
@@ -116,10 +103,7 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
  *   Also, consider the case when a page is shared by two processes,
  *   and one process is about to free the page. Also, think about TLB as well ;-)
  */
-void free_page(unsigned int vpn)
-{
-}
-
+void free_page(unsigned int vpn) { }
 
 /**
  * handle_page_fault()
@@ -137,11 +121,7 @@ void free_page(unsigned int vpn)
  *   @true on successful fault handling
  *   @false otherwise
  */
-bool handle_page_fault(unsigned int vpn, unsigned int rw)
-{
-	return false;
-}
-
+bool handle_page_fault(unsigned int vpn, unsigned int rw) { return false; }
 
 /**
  * switch_process()
@@ -156,11 +136,9 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw)
  *   If there is no process with @pid in the @processes list, fork a process
  *   from the @current. This implies the forked child process should have
  *   the identical page table entry 'values' to its parent's (i.e., @current)
- *   page table. 
+ *   page table.
  *   To implement the copy-on-write feature, you should manipulate the writable
- *   bit in PTE and mapcounts for shared pages. You may use pte->private for 
+ *   bit in PTE and mapcounts for shared pages. You may use pte->private for
  *   storing some useful information :-)
  */
-void switch_process(unsigned int pid)
-{
-}
+void switch_process(unsigned int pid) { }
