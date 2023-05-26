@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "types.h"
 #include "list_head.h"
@@ -92,7 +93,38 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) { }
  *   Return allocated page frame number.
  *   Return -1 if all page frames are allocated.
  */
-unsigned int alloc_page(unsigned int vpn, unsigned int rw) { return -1; }
+
+int alloc_pf() {
+	for (int i = 0;i < NR_PAGEFRAMES;i++) {
+		if (mapcounts[i] == 0) {
+			mapcounts[i]++;
+			return i;
+		}
+	}
+	return -1;
+}
+
+void free_pf(unsigned int pfn) { mapcounts[pfn]--; }
+
+unsigned int alloc_page(unsigned int vpn, unsigned int rw) {
+	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
+	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
+
+	struct pte_directory** pd = &ptbr->outer_ptes[pd_index];
+	if (*pd == NULL) {
+		*pd = (struct pte_directory*)malloc(sizeof(struct pte_directory));
+	}
+	assert(pd != NULL);
+
+	struct pte *pte = &(*pd)->ptes[pte_index];
+	unsigned int pfn = alloc_pf();
+
+	pte->pfn = pfn;
+	pte->valid = true;
+	pte->rw = rw;
+
+	return pfn;
+}
 
 /**
  * free_page(@vpn)
@@ -103,7 +135,26 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw) { return -1; }
  *   Also, consider the case when a page is shared by two processes,
  *   and one process is about to free the page. Also, think about TLB as well ;-)
  */
-void free_page(unsigned int vpn) { }
+void free_page(unsigned int vpn) {
+	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
+	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
+
+	struct pte_directory* pd = ptbr->outer_ptes[pd_index];
+	assert(pd != NULL);
+	struct pte *pte = &pd->ptes[pte_index];
+
+	// make pte invalid only when it is not shared
+	if (mapcounts[pte->pfn] == 1)
+		pte->valid = false;
+
+	free_pf(pte->pfn);
+
+	// If every pte is not valid, free pd
+	for (int i = 0; i < NR_PTES_PER_PAGE;i++) {
+		if (pd->ptes[i].valid) return;
+	}
+	free(pd);
+}
 
 /**
  * handle_page_fault()
