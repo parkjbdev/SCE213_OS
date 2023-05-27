@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <memory.h>
 
 #include "types.h"
 #include "list_head.h"
@@ -192,4 +193,39 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw) { return false; }
  *   bit in PTE and mapcounts for shared pages. You may use pte->private for
  *   storing some useful information :-)
  */
-void switch_process(unsigned int pid) { }
+void switch_process(unsigned int pid) {
+	/** Check if process with @pid exists in @processes */
+	struct list_head *pos = NULL;
+	struct process * process = NULL;
+	list_for_each(pos, &processes) {
+		process = list_entry(pos, struct process, list);
+		if (process->pid == pid) break;
+	}
+
+	/** put @current process to @processes */
+	list_add_tail(&current->list, &processes);
+
+	/** If process is not found in @processes, fork current process */
+	if (process == NULL) {
+		process = (struct process*)malloc(sizeof(struct process));
+		process->pid = pid;
+		process->list.prev = &process->list;
+		process->list.next = &process->list;
+
+		/** increase @mapcount and make shared memories only readable before copying @pagetable to new process */
+		for (int i = 0;i < NR_PTES_PER_PAGE;i++) {
+			struct pte_directory * pd = current->pagetable.outer_ptes[i];
+			if (pd == NULL) continue;
+			for (int j = 0;j < NR_PTES_PER_PAGE;j++) {
+				if (pd->ptes[j].valid) {
+					pd->ptes[j].private = pd->ptes[j].rw;
+					pd->ptes[j].rw = ACCESS_READ;
+					mapcounts[pd->ptes[j].pfn]++;
+				}
+			}
+		}
+		memcpy(&process->pagetable, &current->pagetable, sizeof(struct pagetable));
+	} else list_del(&process->list);
+
+	current = process;
+}
