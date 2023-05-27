@@ -95,8 +95,9 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) { }
  *   Return -1 if all page frames are allocated.
  */
 
-int alloc_pf() {
-	for (int i = 0;i < NR_PAGEFRAMES;i++) {
+int alloc_pf()
+{
+	for (int i = 0; i < NR_PAGEFRAMES; i++) {
 		if (mapcounts[i] == 0) {
 			mapcounts[i]++;
 			return i;
@@ -107,7 +108,8 @@ int alloc_pf() {
 
 void free_pf(unsigned int pfn) { mapcounts[pfn]--; }
 
-unsigned int alloc_page(unsigned int vpn, unsigned int rw) {
+unsigned int alloc_page(unsigned int vpn, unsigned int rw)
+{
 	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
 	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
 
@@ -117,7 +119,7 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw) {
 	}
 	assert(pd != NULL);
 
-	struct pte *pte = &(*pd)->ptes[pte_index];
+	struct pte* pte = &(*pd)->ptes[pte_index];
 	unsigned int pfn = alloc_pf();
 
 	pte->pfn = pfn;
@@ -136,13 +138,14 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw) {
  *   Also, consider the case when a page is shared by two processes,
  *   and one process is about to free the page. Also, think about TLB as well ;-)
  */
-void free_page(unsigned int vpn) {
+void free_page(unsigned int vpn)
+{
 	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
 	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
 
 	struct pte_directory* pd = ptbr->outer_ptes[pd_index];
 	assert(pd != NULL);
-	struct pte *pte = &pd->ptes[pte_index];
+	struct pte* pte = &pd->ptes[pte_index];
 
 	// make pte invalid only when it is not shared
 	if (mapcounts[pte->pfn] == 1)
@@ -151,8 +154,9 @@ void free_page(unsigned int vpn) {
 	free_pf(pte->pfn);
 
 	// If every pte is not valid, free pd
-	for (int i = 0; i < NR_PTES_PER_PAGE;i++) {
-		if (pd->ptes[i].valid) return;
+	for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
+		if (pd->ptes[i].valid)
+			return;
 	}
 	free(pd);
 }
@@ -193,13 +197,16 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw) { return false; }
  *   bit in PTE and mapcounts for shared pages. You may use pte->private for
  *   storing some useful information :-)
  */
-void switch_process(unsigned int pid) {
+void switch_process(unsigned int pid)
+{
 	/** Check if process with @pid exists in @processes */
-	struct list_head *pos = NULL;
-	struct process * process = NULL;
-	list_for_each(pos, &processes) {
+	struct list_head* pos = NULL;
+	struct process* process = NULL;
+	list_for_each(pos, &processes)
+	{
 		process = list_entry(pos, struct process, list);
-		if (process->pid == pid) break;
+		if (process->pid == pid)
+			break;
 	}
 
 	/** put @current process to @processes */
@@ -213,10 +220,11 @@ void switch_process(unsigned int pid) {
 		process->list.next = &process->list;
 
 		/** increase @mapcount and make shared memories only readable before copying @pagetable to new process */
-		for (int i = 0;i < NR_PTES_PER_PAGE;i++) {
-			struct pte_directory * pd = current->pagetable.outer_ptes[i];
-			if (pd == NULL) continue;
-			for (int j = 0;j < NR_PTES_PER_PAGE;j++) {
+		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
+			struct pte_directory* pd = current->pagetable.outer_ptes[i];
+			if (pd == NULL)
+				continue;
+			for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
 				if (pd->ptes[j].valid) {
 					pd->ptes[j].private = pd->ptes[j].rw;
 					pd->ptes[j].rw = ACCESS_READ;
@@ -225,7 +233,8 @@ void switch_process(unsigned int pid) {
 			}
 		}
 		memcpy(&process->pagetable, &current->pagetable, sizeof(struct pagetable));
-	} else list_del(&process->list);
+	} else
+		list_del(&process->list);
 
 	current = process;
 }
