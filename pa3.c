@@ -125,6 +125,7 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 	pte->pfn = pfn;
 	pte->valid = true;
 	pte->rw = rw;
+	pte->private = rw;
 
 	return pfn;
 }
@@ -177,7 +178,42 @@ void free_page(unsigned int vpn)
  *   @true on successful fault handling
  *   @false otherwise
  */
-bool handle_page_fault(unsigned int vpn, unsigned int rw) { return false; }
+bool handle_page_fault(unsigned int vpn, unsigned int rw)
+{
+	//	struct current_pagetable* ptbr = &current->pagetable;
+	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
+	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
+
+	/** Case 0. @pd is invalid */
+	struct pte_directory** pd = &ptbr->outer_ptes[pd_index];
+	if (pd == NULL) {
+		// Handle here
+	}
+
+	/** Case 1. @pte is invalid */
+	struct pte* pte = &(*pd)->ptes[pte_index];
+	if (pte == NULL) {
+		// Handle here
+	}
+
+	/** Case 2. PTE is not writable, but @rw is for write */
+	if (pte->rw == ACCESS_READ && rw == ACCESS_WRITE) {
+		if (pte->private == ACCESS_READ + ACCESS_WRITE) {
+			/** Implement Copy on write */
+			if (mapcounts[pte->pfn] > 1) {
+				mapcounts[pte->pfn]--;
+				pte->pfn = alloc_pf();
+				pte->valid = true;
+			}
+			pte->rw = pte->private;
+
+			return true;
+		} else
+			return false;
+	}
+
+	return false;
+}
 
 /**
  * switch_process()
@@ -197,17 +233,43 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw) { return false; }
  *   bit in PTE and mapcounts for shared pages. You may use pte->private for
  *   storing some useful information :-)
  */
+struct pagetable* clone_pagetable(const struct pagetable* src)
+{
+	struct pagetable* pt = (struct pagetable*)malloc(sizeof(struct pagetable));
+	assert(pt != NULL);
+
+	for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
+		if (src->outer_ptes[i] != NULL) {
+			pt->outer_ptes[i] = (struct pte_directory*)malloc(sizeof(struct pte_directory));
+			assert(pt->outer_ptes[i] != NULL);
+			memcpy(pt->outer_ptes[i], src->outer_ptes[i], sizeof(struct pte_directory));
+		} else {
+			pt->outer_ptes[i] = NULL;
+		}
+	}
+
+	return pt;
+}
+
+struct process* find_process(unsigned int pid)
+{
+	struct process* pos = NULL;
+	bool found = false;
+
+	list_for_each_entry(pos, &processes, list)
+	{
+		if (pos->pid == pid) {
+			found = true;
+			break;
+		}
+	}
+
+	return found ? pos : NULL;
+}
 void switch_process(unsigned int pid)
 {
 	/** Check if process with @pid exists in @processes */
-	struct list_head* pos = NULL;
-	struct process* process = NULL;
-	list_for_each(pos, &processes)
-	{
-		process = list_entry(pos, struct process, list);
-		if (process->pid == pid)
-			break;
-	}
+	struct process* process = find_process(pid);
 
 	/** put @current process to @processes */
 	list_add_tail(&current->list, &processes);
@@ -226,15 +288,17 @@ void switch_process(unsigned int pid)
 				continue;
 			for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
 				if (pd->ptes[j].valid) {
-					pd->ptes[j].private = pd->ptes[j].rw;
 					pd->ptes[j].rw = ACCESS_READ;
 					mapcounts[pd->ptes[j].pfn]++;
 				}
 			}
 		}
-		memcpy(&process->pagetable, &current->pagetable, sizeof(struct pagetable));
-	} else
+		/** deep copy @pagetable */
+		process->pagetable = *clone_pagetable(&current->pagetable);
+	} else {
 		list_del(&process->list);
+	}
 
 	current = process;
+	ptbr = &current->pagetable;
 }
