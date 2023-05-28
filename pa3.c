@@ -49,6 +49,38 @@ extern struct tlb_entry tlb[1UL << (PTES_PER_PAGE_SHIFT * 2)];
 extern unsigned int mapcounts[];
 
 /**
+ * find_tlbe(@vpn)
+ *
+ * DESCRIPTION
+ *   Find @tlb that matches @vpn
+ *
+ * RETURN
+ *   Return NULL if no @vpn matches on @tlb table
+ *   Return address of @tlb_entry if matching @vpn is found
+ */
+struct tlb_entry* find_tlbe(unsigned int vpn) {
+	for (int i = 0;i < NR_TLB_ENTRIES;i++) {
+		if (tlb[i].vpn == vpn && tlb[i].valid) {
+			return tlb + i;
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * flush_tlb()
+ *
+ * DESCRIPTION
+ *   Makes all tlb entries invalid
+ */
+void flush_tlb() {
+	for (int i = 0;i < NR_TLB_ENTRIES;i++) {
+		tlb[i].valid = false;
+	}
+}
+
+/**
  * lookup_tlb(@vpn, @rw, @pfn)
  *
  * DESCRIPTION
@@ -63,7 +95,15 @@ extern unsigned int mapcounts[];
  *   Return true if the translation is cached in the TLB.
  *   Return false otherwise
  */
-bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn) { return false; }
+bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn) {
+	struct tlb_entry* tlbe = find_tlbe(vpn);
+	if (tlbe == NULL) return false;
+	if ((tlbe->rw & rw) == rw) {
+		*pfn = tlbe->pfn;
+		return true;
+	}
+	return false;
+}
 
 /**
  * insert_tlb(@vpn, @rw, @pfn)
@@ -76,7 +116,22 @@ bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn) { return f
  *   Also, in the current simulator, TLB is big enough to cache all the entries of
  *   the current page table, so don't worry about TLB entry eviction. ;-)
  */
-void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) { }
+void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) {
+	struct tlb_entry* tlbe = find_tlbe(vpn);
+	if (tlbe == NULL) {
+		// Create new tlb
+		for (int i = 0;i < NR_TLB_ENTRIES;i++) {
+			if (tlb[i].valid == false) {
+				tlbe = tlb + i;
+				break;
+			}
+		}
+	}
+	tlbe->vpn = vpn; // Of course if tlbe exists
+	tlbe->pfn = pfn;
+	tlbe->rw = rw;
+	tlbe->valid = true; // Of course if tlbe exists
+}
 
 /**
  * alloc_page(@vpn, @rw)
@@ -150,6 +205,12 @@ void free_page(unsigned int vpn)
 
 	pte->valid = false;
 	free_pf(pte->pfn);
+
+	// free tlbe
+	struct tlb_entry* tlbe = find_tlbe(vpn);
+	if (tlbe != NULL) {
+		tlbe->valid = false;
+	}
 
 	// If every pte is not valid, free pd
 	for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
@@ -295,7 +356,7 @@ void switch_process(unsigned int pid)
 	} else {
 		list_del(&process->list);
 	}
-
+	flush_tlb();
 	current = process;
 	ptbr = &current->pagetable;
 }
