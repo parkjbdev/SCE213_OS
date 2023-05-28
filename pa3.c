@@ -148,10 +148,7 @@ void free_page(unsigned int vpn)
 	assert(pd != NULL);
 	struct pte* pte = &pd->ptes[pte_index];
 
-	// make pte invalid only when it is not shared
-	if (mapcounts[pte->pfn] == 1)
-		pte->valid = false;
-
+	pte->valid = false;
 	free_pf(pte->pfn);
 
 	// If every pte is not valid, free pd
