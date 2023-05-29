@@ -58,9 +58,10 @@ extern unsigned int mapcounts[];
  *   Return NULL if no @vpn matches on @tlb table
  *   Return address of @tlb_entry if matching @vpn is found
  */
-struct tlb_entry* find_tlbe(unsigned int vpn) {
-	for (int i = 0;i < NR_TLB_ENTRIES;i++) {
-		if (tlb[i].vpn == vpn && tlb[i].valid) {
+struct tlb_entry* find_tlbe(unsigned int vpn)
+{
+	for (int i = 0; i < NR_TLB_ENTRIES; i++) {
+		if (tlb[i].valid && tlb[i].vpn == vpn) {
 			return tlb + i;
 		}
 	}
@@ -74,8 +75,9 @@ struct tlb_entry* find_tlbe(unsigned int vpn) {
  * DESCRIPTION
  *   Makes all tlb entries invalid
  */
-void flush_tlb() {
-	for (int i = 0;i < NR_TLB_ENTRIES;i++) {
+void flush_tlb()
+{
+	for (int i = 0; i < NR_TLB_ENTRIES; i++) {
 		tlb[i].valid = false;
 	}
 }
@@ -95,9 +97,11 @@ void flush_tlb() {
  *   Return true if the translation is cached in the TLB.
  *   Return false otherwise
  */
-bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn) {
+bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn)
+{
 	struct tlb_entry* tlbe = find_tlbe(vpn);
-	if (tlbe == NULL) return false;
+	if (tlbe == NULL)
+		return false;
 	if ((tlbe->rw & rw) == rw) {
 		*pfn = tlbe->pfn;
 		return true;
@@ -116,11 +120,12 @@ bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int* pfn) {
  *   Also, in the current simulator, TLB is big enough to cache all the entries of
  *   the current page table, so don't worry about TLB entry eviction. ;-)
  */
-void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) {
+void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn)
+{
 	struct tlb_entry* tlbe = find_tlbe(vpn);
 	if (tlbe == NULL) {
 		// Create new tlb
-		for (int i = 0;i < NR_TLB_ENTRIES;i++) {
+		for (int i = 0; i < NR_TLB_ENTRIES; i++) {
 			if (tlb[i].valid == false) {
 				tlbe = tlb + i;
 				break;
@@ -131,6 +136,63 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) {
 	tlbe->pfn = pfn;
 	tlbe->rw = rw;
 	tlbe->valid = true; // Of course if tlbe exists
+}
+
+/**
+ * get_pt(@vpn)
+ *
+ * RETURN
+ *   Return the page table of @vpn.
+ */
+struct pte_directory** get_pt(unsigned int vpn)
+{
+	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
+	return ptbr->outer_ptes + pd_index;
+}
+
+/**
+ * get_pte(@pt, @vpn)
+ *
+ * RETURN
+ *   Return the page table entry of @vpn in @pt.
+ */
+struct pte* get_pte(struct pte_directory* pt, unsigned int vpn)
+{
+	if (pt == NULL)
+		return NULL;
+	unsigned int pt_index = vpn % NR_PTES_PER_PAGE;
+	return &pt->ptes[pt_index];
+}
+
+/**
+ * alloc_pte(@pt, @vpn)
+ *
+ * DESCRIPTION
+ *   Find a free page frame and increases its reference count.
+ *   returns its PFN. If there is no free page frame, return -1.
+ *
+ * RETURN
+ *   Returns free PFN.
+ *   Return -1 if there is no free page frame.
+ */
+int alloc_pf()
+{
+	for (int i = 0; i < NR_PAGEFRAMES; i++) {
+		if (mapcounts[i] == 0) {
+			mapcounts[i]++;
+			return i;
+		}
+	}
+	return -1;
+}
+
+bool free_pf(unsigned int pfn)
+{
+	if (--mapcounts[pfn] < 0) {
+		return false;
+	} else {
+		return true;
+	}
 }
 
 /**
@@ -149,38 +211,22 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn) {
  *   Return allocated page frame number.
  *   Return -1 if all page frames are allocated.
  */
-
-int alloc_pf()
-{
-	for (int i = 0; i < NR_PAGEFRAMES; i++) {
-		if (mapcounts[i] == 0) {
-			mapcounts[i]++;
-			return i;
-		}
-	}
-	return -1;
-}
-
-void free_pf(unsigned int pfn) { mapcounts[pfn]--; }
-
 unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 {
-	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
-	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
-
-	struct pte_directory** pd = &ptbr->outer_ptes[pd_index];
-	if (*pd == NULL) {
-		*pd = (struct pte_directory*)malloc(sizeof(struct pte_directory));
+	struct pte_directory** pt = get_pt(vpn);
+	if (*pt == NULL) {
+		*pt = (struct pte_directory*)malloc(sizeof(struct pte_directory));
 	}
-	assert(pd != NULL);
 
-	struct pte* pte = &(*pd)->ptes[pte_index];
+	struct pte* pte = get_pte(*pt, vpn);
+
 	unsigned int pfn = alloc_pf();
+	assert(pfn != -1); // Out of memory!
 
 	pte->pfn = pfn;
 	pte->valid = true;
 	pte->rw = rw;
-	pte->private = rw;
+	pte->private = rw; /** backup original @rw flag for copy-on-write */
 
 	return pfn;
 }
@@ -196,15 +242,11 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
  */
 void free_page(unsigned int vpn)
 {
-	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
-	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
-
-	struct pte_directory* pd = ptbr->outer_ptes[pd_index];
-	assert(pd != NULL);
-	struct pte* pte = &pd->ptes[pte_index];
+	struct pte_directory** pt = get_pt(vpn);
+	struct pte* pte = get_pte(*pt, vpn);
 
 	pte->valid = false;
-	free_pf(pte->pfn);
+	assert(free_pf(pte->pfn));
 
 	// free tlbe
 	struct tlb_entry* tlbe = find_tlbe(vpn);
@@ -212,12 +254,13 @@ void free_page(unsigned int vpn)
 		tlbe->valid = false;
 	}
 
-	// If every pte is not valid, free pd
+	// If every pte is not valid, free pt
 	for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
-		if (pd->ptes[i].valid)
+		if ((*pt)->ptes[i].valid) {
 			return;
+		}
 	}
-	free(pd);
+	free(*pt);
 }
 
 /**
@@ -238,58 +281,41 @@ void free_page(unsigned int vpn)
  */
 bool handle_page_fault(unsigned int vpn, unsigned int rw)
 {
-	//	struct current_pagetable* ptbr = &current->pagetable;
-	unsigned int pd_index = vpn / NR_PTES_PER_PAGE;
-	unsigned int pte_index = vpn % NR_PTES_PER_PAGE;
+	struct pte_directory** pt = get_pt(vpn);
+	struct pte* pte = get_pte(*pt, vpn);
 
-	/** Case 0. @pd is invalid */
-	struct pte_directory** pd = &ptbr->outer_ptes[pd_index];
-	if (pd == NULL) {
-		// Handle here
-	}
-
+	/** Case 0. @pt is invalid */
 	/** Case 1. @pte is invalid */
-	struct pte* pte = &(*pd)->ptes[pte_index];
-	if (pte == NULL) {
+	if (*pt == NULL || pte == NULL) {
 		// Handle here
+		alloc_page(vpn, rw);
 	}
 
 	/** Case 2. PTE is not writable, but @rw is for write */
-	if (pte->rw == ACCESS_READ && rw == ACCESS_WRITE) {
-		if (pte->private == ACCESS_READ + ACCESS_WRITE) {
-			/** Implement Copy on write */
-			if (mapcounts[pte->pfn] > 1) {
-				mapcounts[pte->pfn]--;
-				pte->pfn = alloc_pf();
-				pte->valid = true;
-			}
-			pte->rw = pte->private;
+	if (pte->rw == ACCESS_READ && pte->private == ACCESS_READ + ACCESS_WRITE && rw == ACCESS_WRITE) {
+		/** Implement Copy on write */
+		if (mapcounts[pte->pfn] > 1) {
+			mapcounts[pte->pfn]--;
+			pte->pfn = alloc_pf();
+			pte->valid = true;
+		}
+		pte->rw = pte->private;
 
-			return true;
-		} else
-			return false;
+		return true;
 	}
 
 	return false;
 }
 
 /**
- * switch_process()
+ * clone_pagetable(@src)
  *
  * DESCRIPTION
- *   If there is a process with @pid in @processes, switch to the process.
- *   The @current process at the moment should be put into the @processes
- *   list, and @current should be replaced to the requested process.
- *   Make sure that the next process is unlinked from the @processes, and
- *   @ptbr is set properly.
+ *   Deep Copy the page table @src.
+ *   This function is called when the process is forked.
  *
- *   If there is no process with @pid in the @processes list, fork a process
- *   from the @current. This implies the forked child process should have
- *   the identical page table entry 'values' to its parent's (i.e., @current)
- *   page table.
- *   To implement the copy-on-write feature, you should manipulate the writable
- *   bit in PTE and mapcounts for shared pages. You may use pte->private for
- *   storing some useful information :-)
+ * RETURN
+ *   Returns the address of the cloned page table.
  */
 struct pagetable* clone_pagetable(const struct pagetable* src)
 {
@@ -309,21 +335,47 @@ struct pagetable* clone_pagetable(const struct pagetable* src)
 	return pt;
 }
 
+/**
+ * find_process(@pid)
+ *
+ * DESCRIPTION
+ *   Find the process with @pid in @processes list.
+ *
+ * RETURN
+ *   Returns the address of the process with @pid.
+ */
 struct process* find_process(unsigned int pid)
 {
 	struct process* pos = NULL;
-	bool found = false;
 
 	list_for_each_entry(pos, &processes, list)
 	{
 		if (pos->pid == pid) {
-			found = true;
-			break;
+			return pos;
 		}
 	}
 
-	return found ? pos : NULL;
+	return NULL;
 }
+
+/**
+ * switch_process()
+ *
+ * DESCRIPTION
+ *   If there is a process with @pid in @processes, switch to the process.
+ *   The @current process at the moment should be put into the @processes
+ *   list, and @current should be replaced to the requested process.
+ *   Make sure that the next process is unlinked from the @processes, and
+ *   @ptbr is set properly.
+ *
+ *   If there is no process with @pid in the @processes list, fork a process
+ *   from the @current. This implies the forked child process should have
+ *   the identical page table entry 'values' to its parent's (i.e., @current)
+ *   page table.
+ *   To implement the copy-on-write feature, you should manipulate the writable
+ *   bit in PTE and @mapcounts for shared pages. You may use pte->private for
+ *   storing some useful information :-)
+ */
 void switch_process(unsigned int pid)
 {
 	/** Check if process with @pid exists in @processes */
@@ -341,13 +393,13 @@ void switch_process(unsigned int pid)
 
 		/** increase @mapcount and make shared memories only readable before copying @pagetable to new process */
 		for (int i = 0; i < NR_PTES_PER_PAGE; i++) {
-			struct pte_directory* pd = current->pagetable.outer_ptes[i];
-			if (pd == NULL)
+			struct pte_directory* pt = current->pagetable.outer_ptes[i];
+			if (pt == NULL)
 				continue;
 			for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
-				if (pd->ptes[j].valid) {
-					pd->ptes[j].rw = ACCESS_READ;
-					mapcounts[pd->ptes[j].pfn]++;
+				if (pt->ptes[j].valid) {
+					pt->ptes[j].rw = ACCESS_READ;
+					mapcounts[pt->ptes[j].pfn]++;
 				}
 			}
 		}
