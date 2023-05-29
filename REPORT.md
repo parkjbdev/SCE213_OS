@@ -424,7 +424,7 @@ process #0의 마지막 상태의 pagetable은 다음과 같았다.
 
 다시한번 그 과정을 도식화하면 다음과 같다.
 
-![testcases/cow-2](img_cow-2.png)
+![testcases/cow-2](./img_cow-2.png)
 
 ## TLB
 
