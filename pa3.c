@@ -83,6 +83,20 @@ void flush_tlb()
 }
 
 /**
+ *
+ *
+ */
+void update_tlb(unsigned int vpn, bool valid, unsigned int pfn, unsigned int rw)
+{
+	struct tlb_entry* tlbe = find_tlbe(vpn);
+	if (tlbe == NULL)
+		return;
+	tlbe->rw = rw;
+	tlbe->pfn = pfn;
+	tlbe->valid = valid;
+}
+
+/**
  * lookup_tlb(@vpn, @rw, @pfn)
  *
  * DESCRIPTION
@@ -291,6 +305,9 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw)
 		alloc_page(vpn, rw);
 	}
 
+	assert(*pt != NULL);
+	assert(pte != NULL);
+
 	/** Case 2. PTE is not writable, but @rw is for write */
 	if (pte->rw == ACCESS_READ && pte->private == ACCESS_READ + ACCESS_WRITE && rw == ACCESS_WRITE) {
 		/** Implement Copy on write */
@@ -300,6 +317,9 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw)
 			pte->valid = true;
 		}
 		pte->rw = pte->private;
+
+		//  Update TLB as well
+		update_tlb(vpn, true, pte->pfn, pte->rw);
 
 		return true;
 	}
@@ -400,6 +420,7 @@ void switch_process(unsigned int pid)
 				if (pt->ptes[j].valid) {
 					pt->ptes[j].rw = ACCESS_READ;
 					mapcounts[pt->ptes[j].pfn]++;
+					// No need to update TLB since it is going to be flushed
 				}
 			}
 		}
