@@ -440,11 +440,26 @@ processs를 switch 할 때, 이전의 pid를 `private` 멤버에 저장하는 �
 이러한 경우가 생긴다면, Belady's Algorithm, FIFO, LRU 등등의 방법을 이용하여 victim page를 선택하여 해당 tlb entry 를 free시켜 사용하면 될 것이다.
 
 `read` 혹은 `write` operation을 하였을 때, 해당 vpn이 tlb에 적혀있는지 `lookup_tlb`를 통해서 참조하는 과정을 거친다.
-만약 해당 `vpn`에 대한 tlb entry가 존재할 경우, tlb hit 된것으로 판단하여 tlb에 적혀진 `pfn`을 보고 MMU가 `vpn`을 변환하게 된다.
+만약 해당 `vpn`에 대한 tlb entry가 존재하고, rw bit을 참조하여 허용되는 operation일 경우, tlb hit 된것으로 판단하여 tlb에 적혀진 `pfn`을 보고 MMU가 `vpn`을 변환하게 된다.
 하지만 tlb hit이 나지 않았을 경우, 추후에 참조할 가능성을 고려해서 tlb에 `pte`의 정보를 작성해주어야 한다.
 이를 위해서 먼저 주어진 `vpn`에 매칭하는 `pte`를 찾아 `rw` bit, `pfn` 값 등을 참조한다.
 이렇게 읽어온 값들을 `insert_tlb`에서 tlb에 삽입 혹은 update하게 되는 과정을 구현하면 tlb에 대한 주요 구현은 마무리 되었다.
 
-하지만, 사소하게 신경써주어야 하는것들로, pte의 값들이 바뀌었을 때, tlb의 값도 변경해서 update 해주어야 한다는 점이다.
-이번 과제의 경우, testcase에서 이를 검출하는 case는 존재하지 않아 문제없이 통과하였지만, 이를 고려하지 않는다면, page fault가 난 이후 write 하는 과정에서 tlb와 pte에 저장된 rw bit이나 pfn 값이 달라 문제가 발생할 수 있다.
-이러한 문제점을 인지하고, commit 253cc7f7에서 수정하였다.
+~~하지만, 사소하게 신경써주어야 하는것들로, pte의 값들이 바뀌었을 때, tlb의 값도 변경해서 update 해주어야 한다는 점이다.~~
+~~이번 과제의 경우, testcase에서 이를 검출하는 case는 존재하지 않아 문제없이 통과하였지만, 이를 고려하지 않는다면, page fault가 난 이후 write 하는 과정에서 tlb와 pte에 저장된 rw bit이나 pfn 값이 달라 문제가 발생할 수 있다.~~
+~~이러한 문제점을 인지하고, commit 253cc7f7에서 수정하였다.~~
+
+추후, `vm.c`를 확인하였는데, `__translate` 에서 `insert_tlb`를 통해서 tlb를 update 해주는 과정이 존재하는 것을 확인하고, 해당 코드를 삭제하였다.
+
+## commit f7f01b80: cleanup & add comments
+
+우선, `pd`라는 변수의 이름이 잘 와닿지 않아, 어려움이 있었는데, 결국 최종 `pte`를 알아내기 전의 마지막 page table 이므로, `pt`로 이름을 변경하였다.
+
+그리고, DRY(Don't Repeat Yourself) 원칙과 readability를 위해서, `pt`와 `pte`를 구하는 과정을 `get_pt`와 `get_pte`라는 새로운 함수를 만들어 사용하였다.
+
+## Lessons Learned
+
+- 이번 과제를 통해서 memory management unit이 pagetable을 조회하며 vpn을 pfn으로 변환하는 과정을 구현하며, vpn에 해당하는 pte를 어떻게 찾아가는 과정을 알 수 있었다.
+- 새로운 process를 fork할 때, shared memory를 사용하여 메모리를 효율적으로 사용하게 된다. 하지만, write을 할 때에는, 서로 다른 process 공유하고 있는 메모리에 작성할 경우 문제가 된다. 따라서, fork하는 process의 pte를 모두 read only page로 바꾸어준 뒤, write을 시도하여 page fault가 발생하면 handler가 그제서야 해당 page를 copy 해주는 방식인 Copy on write을 이용하였다. 또, 이런 과정을 거쳐, 해당 page를 참조하는 process가 결국 하나가 되었을 경우에는 다시 기존의 `rw` bit을 복구시켜주었다.
+- TLB 를 이용하여 page table entry를 더욱 빨리 찾을 수 있는데, read 혹은 write 명령이 발생할 때마다, 이전에 TLB에 등록된 적이 없는 vpn이라면, TLB에 등록시키는 과정을 구현하였다. 또, 주어진 vpn과 rw 상태에 대해서 tlb hit이 나는지 판별하는 과정을 구현하였다. TLB를 이전에는 마냥 pagetable을 캐시해둔 것으로 추상적으로 알고 있었지만, 언제 등록되는지에 대해서는 자세히 알지 못하였다. 물론 실제 운영체제에서는 더 복잡한 조건이 있을 수 있지만, 이번 과제를 통해서 간단하게나마 알 수 있었다.
+****
