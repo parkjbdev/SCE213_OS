@@ -83,20 +83,6 @@ void flush_tlb()
 }
 
 /**
- *
- *
- */
-void update_tlb(unsigned int vpn, bool valid, unsigned int pfn, unsigned int rw)
-{
-	struct tlb_entry* tlbe = find_tlbe(vpn);
-	if (tlbe == NULL)
-		return;
-	tlbe->rw = rw;
-	tlbe->pfn = pfn;
-	tlbe->valid = valid;
-}
-
-/**
  * lookup_tlb(@vpn, @rw, @pfn)
  *
  * DESCRIPTION
@@ -317,9 +303,6 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw)
 			pte->valid = true;
 		}
 		pte->rw = pte->private;
-
-		//  Update TLB as well
-		update_tlb(vpn, true, pte->pfn, pte->rw);
 
 		return true;
 	}
